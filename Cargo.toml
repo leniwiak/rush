@@ -1,0 +1,32 @@
+[package]
+name = "rush"
+version = "0.2.0"
+edition = "2021"
+
+[build]
+rustflags=["-C prefer-dynamic"]
+
+[profile.release]
+strip = true
+debug = false
+
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
+
+[dependencies]
+libc = "*"
+rand = "0.8.4"
+
+[dependencies.carrot_libs]
+path = "../carrot-libs"
+
+[[bin]]
+name = "if"
+path = "src/if.rs"
+
+[[bin]]
+name = "rush"
+path = "src/rush.rs"
