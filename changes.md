@@ -8,6 +8,15 @@
 
 # Release 0.2.1:
 
+### Added on 29.03.2024
+
+- RUSH: ELSE command
+
+### Added on 01.04.2024
+
+- *: Break code to multiple parts
+- IF: Rename to 'TEST'
+
 ### Waiting features:
 
 - RUSH: Deal with char boundaries

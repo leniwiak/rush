@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::io;
 use std::io::Write;
 use std::os::unix::process::ExitStatusExt;
@@ -7,25 +9,16 @@ use std::collections::HashMap;
 use carrot_libs::args;
 use carrot_libs::input;
 
-/*
-There are three types of commands in RUSH
-- Standard commands: When you try to run something like 'git' or 'htop', it will be executed by system with all it's arguments.
-- Built-in commands: They also get their arguments as usual BUT they will be executed by shell
-- SUPER COMMANDS: They are used to operate output, exit code, or anything else from previous or next commands
- */ 
+mod helpful;
+mod gt;
+mod exit;
+use {helpful::*, gt::*, exit::*};
 
-/*
-This struct will be used as a template for "return" variable.
-"return" helps this shell to find commands that reported success on exit or not
-You'll find more about it later
- */
-#[derive(Debug)]
- pub struct CommandStatus {
-    pub code: Option<i32>,
-    pub success: bool,
-    pub signal: Option<i32>,
-    pub core_dumped: bool 
-}
+pub const SPLIT_COMMANDS:[&str;4] = ["then", "next", "end", "else"];
+pub const NESTABLE_OPERATORS:[&str;1] = ["test"];
+pub const CMP_OPERATORS:[&str;2] = ["test", "else"];
+pub const END_LOGIC:[&str;2] = ["end", "else"];
+
 
 fn main() {
     let opts = args::opts();
@@ -68,7 +61,7 @@ fn init_input_mode() {
         // Get all space separated words from user
         let console_input = input::get(String::from("> "));
         // Separate commands from super commands
-        let commands = split_commands(console_input, Vec::from(["then", "next", "end"]));
+        let commands = split_commands(console_input, SPLIT_COMMANDS.to_vec());
         // Execute those commands
         detect_commands(commands);
     };
@@ -96,7 +89,8 @@ pub fn detect_commands(commands:Vec<Vec<String>>) {
                 "gt" => gt(&commands[index], index, &mut returns),
                 "help" | "?" => help(),
                 "exit" | "quit" | "bye" => exit(&commands[index], index, &mut returns),
-                "next" | "end" => print!(""),
+                "next" | "end" => stop=false,
+                "else" => command_else(&mut index, &mut returns, &commands, &mut stop),
                 "then" => then(&mut index, &mut returns, &commands, &mut stop),
                 _ => runcommand(&commands[index], index, &mut returns)
             };
@@ -109,112 +103,9 @@ pub fn detect_commands(commands:Vec<Vec<String>>) {
         };
     }
 }
-    
-pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec<Vec<String>> {
-    // This list contains all commands passed by the user 
-    let mut commands: Vec<Vec<String>> = Vec::new();
-    /*
-    This will be used to separate SUPER COMMANDS from anything else
-    Expected output: ('af' 'file'), ('then'), ('ad' 'dir')
-    */ 
-    let mut command = Vec::new();
-    let mut index = 0;
-    while index < words.len() {
-        // If built-in keyword appears
-        if spliting_keywords.contains(&words[index].as_str()) {
-            // Separate keyword from PREVIOUSLY collected words
-            // Expected output: ('af' 'file'), ('then' 'ad' 'dir')
-            let (before_keyword, right) = words.split_at(index);
-            // Convert everything to a vector
-            let (before_keyword, right) = (before_keyword.to_vec(), right.to_vec());
-
-            // Separate keyword from NEXT words, that are not collected yet
-            // Expected output: ('af' 'file'), ('then'), ('ad' 'dir')
-            let (keyword, after_keyword) = {
-                let (keyword, after_keyword) = right.split_at(1);
-                (keyword.to_vec(), after_keyword.to_vec())
-            };
-
-            // Send previous words to "commands"
-            // Example: ('af' 'file')
-            if !before_keyword.is_empty() {
-                // Do not append anything if there is nothing before keyword!
-                commands.push(before_keyword.to_vec());
-            }
-            // Send keyword to "commands" exclusively
-            // Example: ('then')
-            commands.push(keyword.to_vec());
-            // We no longer need to deal with ('af' 'file') and ('then') so remove them from words
-            words = after_keyword.to_vec();
-            // Start over with new words
-            // Example: ('ad' 'dir')
-            index = 0;
-        }
-        // If there is not built-in command 
-        else {
-            command.push(words[index].clone());
-            index += 1;
-            if index == words.len() {
-                commands.push(words.clone());
-            };
-        };
-    };
-    commands
-}
-
-
-// Change working directory
-fn gt(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
-    // Check if there is just ONE argument
-    // We can't go to more than one directory at the same time
-    if args.len() == 1 {
-        eprintln!("Give me a directory path to go!");
-        // As usual, run this function to report a failure.
-        // "index" variable contains position of a command
-        // "returns" contains information about all return codes that were reported by commands
-        // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
-        report_failure(index, returns);
-    }
-    else if args.len() > 2 {
-        eprintln!("Cannot go to multiple directories simultaneously!");
-        report_failure(index, returns)
-    }
-    else {
-        match env::set_current_dir(&args[1]) { 
-            Err(e) => {
-                eprintln!("{}: Cannot go into this directory because of an error: {}", args[1], e.kind());
-                report_failure(index, returns);
-            },
-            Ok(_) => {
-                report_success(index, returns);
-            }
-        };
-    };
-}
 
 fn help() {
     todo!("Help!");
-}
-
-// Just go away
-fn exit(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
-    if args.len() == 1 {
-        report_failure(index, returns);
-        process::exit(0)
-    }
-    else if args.len() > 2 {
-        report_failure(index, returns);
-        eprintln!("Cannot exit with multiple exit codes!");
-    }
-    else {
-        match args[1].parse::<i32>() {
-            Err(e) => {
-                eprintln!("Cannot exit with this code because of an error: {:?}", e.kind());
-                report_failure(index, returns);
-            },
-            Ok(code) => { report_success(index, returns); process::exit(code); },
-        }
-    };
 }
 
 // This will be used to execute commands!
@@ -246,28 +137,105 @@ fn runcommand(args:&[String], index:usize, returns:&mut HashMap<usize, CommandSt
     io::stdout().flush().unwrap();
 }
 
-// These functions will be used to report success or failure when built-in or super commands are running
-// This is usefull because typically we don't want the shell to abnormally quit when syntax of if statement is incorrect
-// Instead, we just want to say "Hey! There is a bug!"
-// BUT when rush would work as a subshell just to execute a script, we won't even need it anymore
-pub fn report_success(index:usize, returns:&mut HashMap<usize, CommandStatus>) {
-    let command_status = CommandStatus {code: Some(0),success: true,signal: None,core_dumped: false};
-    returns.insert(index, command_status);
+
+pub fn jump_to_end(index:&mut usize, is_already_inside_cmp_operator:u8, status:bool, stop:&mut bool, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>]) {
+    /*
+    Find "END" keyword and save it's position
+    TIP: There can be multiple END keywords after "THEN". Comparison operations can be nested like in the example below:
+
+    test ad /test then
+        say "Operation succeeded!"
+        test ( math 1+1 = 2 ) then
+            say "It is equal"
+        end
+    end
+     */
+    let mut level = is_already_inside_cmp_operator;
+    let mut index_of_end = 0;
+    for (i,c) in commands[*index+1..].iter().enumerate() {
+        if NESTABLE_OPERATORS.contains(&c[0].as_str()) {
+            level+=1;
+        }
+        if END_LOGIC.contains(&c[0].as_str()) || &c[0] == "else" {
+            level-=1;
+        }
+        if level == 0 {
+            index_of_end=*index+i;
+            break;
+        }
+        if *index+i == commands.len()-1 && !NESTABLE_OPERATORS.contains(&c[0].as_str()) && level != 0 {
+            report_failure(*index, returns);
+            // Tell detect_commands() that it can't execute commands anymore
+            *stop=true;
+            return;
+        }
+    }
+
+    if status {
+        report_success(*index, returns);
+    }
+    else {
+        *index=index_of_end;
+    }
+    
 }
-pub fn report_failure(index:usize, returns:&mut HashMap<usize, CommandStatus>) {
-    let command_status = CommandStatus {code: Some(1),success: false,signal: None,core_dumped: false};
-    returns.insert(index, command_status);
+
+// This function goes back in commands history to find closest comparison operator like "TEST"
+// If that found operator reported "success", find "END" and jump straight to that.
+// Don't do anything between "ELSE" and "END" or another "ELSE".
+// otherwise, (so if previous operator failed) try launching all commands until next "END" or "ELSE"
+fn command_else(index_of_else:&mut usize, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>], stop:&mut bool) {
+    if *index_of_else == 0 {
+        eprintln!("SYNTAX ERROR! Operator \"ELSE\" doesn't work when there is nothing before it!");
+        report_failure(*index_of_else, returns);
+        *stop=true;
+    }
+    if *index_of_else == commands.len()-1 {
+        eprintln!("SYNTAX ERROR! Operator \"ELSE\" doesn't work when there is nothing after it!");
+        report_failure(*index_of_else, returns);
+        *stop=true;
+    }
+
+    // Look for the nearest possible previous comparison operator
+    let mut index_of_nearest_cmp_operator = *index_of_else-1;
+    loop {
+        if CMP_OPERATORS.contains(&commands[index_of_nearest_cmp_operator][0].as_str()) {
+            break;
+        }
+        if index_of_nearest_cmp_operator == 0 && !CMP_OPERATORS.contains(&commands[index_of_nearest_cmp_operator][0].as_str()) {
+            eprintln!("SYNTAX ERROR! Operator \"ELSE\" is NOT preceded by any comparison operator!");
+            report_failure(*index_of_else, returns);
+            *stop=true;
+            break;
+        }
+        index_of_nearest_cmp_operator -= 1;
+    }
+
+    // Check if previous cmp operator succeeded
+    let status_of_cmp_operator = if returns.contains_key(&index_of_nearest_cmp_operator) {
+        returns.get(&index_of_nearest_cmp_operator).unwrap().success
+    }
+    else {
+        eprintln!("OPERATOR \"ELSE\" FAILED! Unable to read exit code of the previous comparison operator!");
+        *stop=true;
+        false
+    };
+    // Do the test - jump to "END" or "ELSE" if needed
+    jump_to_end(index_of_else, 0, !status_of_cmp_operator, stop, returns, commands);
+
+
 }
 
 fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>], stop:&mut bool) {
     if *index_of_then == 0 {
         eprintln!("SYNTAX ERROR! Operator \"THEN\" doesn't work when there is nothing before it!");
         report_failure(*index_of_then, returns);
-        process::exit(1);
+        *stop=true;
     }
     if *index_of_then == commands.len()-1 {
         eprintln!("SYNTAX ERROR! Operator \"THEN\" doesn't work when there is nothing after it!");
         report_failure(*index_of_then, returns);
+        *stop=true;
     }
     // Compare exit status of previous and following commands
     let prev_index = *index_of_then-1;
@@ -276,37 +244,9 @@ fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, c
     }
     else {
         eprintln!("OPERATOR \"THEN\" FAILED! Unable to read exit code of the previous command!");
-        process::exit(1);
+        *stop=true;
+        false
     };
-
-    // Find "END" keyword and save it's position
-    let mut level = 1;
-    let mut index_of_end = 0;
-    for (i,c) in commands[*index_of_then+1..].iter().enumerate() {
-        if c[0]=="if" {
-            level+=1;
-        }
-        if c[0]=="end" {
-            level-=1;
-        }
-        if level == 0 {
-            index_of_end=*index_of_then+i;
-        }
-        if *index_of_then+i == commands.len()-1 && c[0] != "end" && level != 0 {
-            eprintln!("SYNTAX ERROR! Operator \"THEN\" isn't properly closed with \"END\" operator!");
-            report_failure(*index_of_then, returns);
-            // Tell detect_commands() that it can't execute commands anymore
-            *stop=true;
-            return;
-        }
-    }
-
-    // If previous command succeeded, don't do anything special
-    if prev_status {
-        report_success(*index_of_then, returns);
-    }
-    // If it didn't, jump to the index of the farest possible "END" keyword
-    else {
-        *index_of_then=index_of_end;
-    }
+    
+    jump_to_end(index_of_then, 1, prev_status, stop, returns, commands);
 }

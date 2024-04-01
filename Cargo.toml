@@ -24,8 +24,8 @@ rand = "0.8.4"
 path = "../carrot-libs"
 
 [[bin]]
-name = "if"
-path = "src/if.rs"
+name = "test"
+path = "src/test.rs"
 
 [[bin]]
 name = "rush"
