@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::collections::HashMap;
+use std::env;
 
 #[derive(Debug)]
  pub struct CommandStatus {
@@ -36,6 +37,22 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
     This will be used to separate SUPER COMMANDS from anything else
     Expected output: ('af' 'file'), ('then'), ('ad' 'dir')
     */ 
+
+    // First of all, when there's a word that starts with "$"
+    // replace it with variable contents
+    let mut i = 0;
+    // todo - add some comments here
+    while i < words.len() {
+        let w = words[i].clone();
+        if let Some(w) = w.strip_prefix('$') {
+            let variable_contents=env::var_os(w).unwrap_or_default();
+
+            words.remove(i);
+            words.insert(i, variable_contents.into_string().unwrap_or_default());
+            i += 1;
+        }
+    };
+        
     let mut command = Vec::new();
     let mut index = 0;
     while index < words.len() {

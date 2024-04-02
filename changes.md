@@ -30,6 +30,7 @@
 
 - RUSH: More supported shortcuts due to the changes made in libinput in carrot-libs
 - CMP: Ability to compare text and numeric values.
+- RUSH: Initial support for "$varname" syntax
 
 ### Waiting features:
 
