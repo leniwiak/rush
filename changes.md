@@ -16,13 +16,13 @@
 
 - *: Break code to multiple parts
 - IF: Rename to 'TEST'
+- UNTIL: Wait for keypress
+- SLEEP: Add new command that will stop command execution for some time
+- GETENV, SETENV: Ability to view and modify simple variables
 
 ### Waiting features:
 
 - RUSH: Deal with char boundaries
-- GETENV, SETENV: Ability to view and modify simple variables
-- SLEEP: Add new command that will stop command execution for some time
-- UNTIL: Wait for keypress
 
 # Release 0.3.0:
 

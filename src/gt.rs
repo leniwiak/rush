@@ -1,6 +1,7 @@
 use std::collections::HashMap;
-// Very fucking strange behavior in Rust - you have to write "use crate::blah blah" if you want to "mod" something
-// BUT the file is already used as a module somewhere else
+// Very fucking strange behavior in Rust
+// This file can't use "mod" to import some file as module whenever I add "mod gt" to the rush.rs file
+// So when this happend, I need to write this:
 use crate::helpful::*;
 use std::env;
 

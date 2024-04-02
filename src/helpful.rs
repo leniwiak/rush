@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -7,6 +9,12 @@ use std::collections::HashMap;
     pub signal: Option<i32>,
     pub core_dumped: bool 
 }
+
+pub const SPLIT_COMMANDS:[&str;4] = ["then", "next", "end", "else"];
+pub const NESTABLE_OPERATORS:[&str;1] = ["test"];
+pub const CMP_OPERATORS:[&str;2] = ["test", "else"];
+pub const END_LOGIC:[&str;2] = ["end", "else"];
+
 // These functions will be used to report success or failure when built-in or super commands are running
 // This is usefull because typically we don't want the shell to abnormally quit when syntax of "test" statement is incorrect
 // Instead, we just want to say "Hey! There is a bug!"
@@ -19,7 +27,6 @@ pub fn report_failure(index:usize, returns:&mut HashMap<usize, CommandStatus>) {
     let command_status = CommandStatus {code: Some(1),success: false,signal: None,core_dumped: false};
     returns.insert(index, command_status);
 }
-
 
 
 pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec<Vec<String>> {

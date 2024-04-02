@@ -12,13 +12,11 @@ use carrot_libs::input;
 mod helpful;
 mod gt;
 mod exit;
-use {helpful::*, gt::*, exit::*};
-
-pub const SPLIT_COMMANDS:[&str;4] = ["then", "next", "end", "else"];
-pub const NESTABLE_OPERATORS:[&str;1] = ["test"];
-pub const CMP_OPERATORS:[&str;2] = ["test", "else"];
-pub const END_LOGIC:[&str;2] = ["end", "else"];
-
+mod getenv;
+mod setenv;
+mod test_lib;
+mod end;
+use {helpful::*, test_lib::*, getenv::*, setenv::*, end::*, gt::*, exit::*};
 
 fn main() {
     let opts = args::opts();
@@ -89,6 +87,8 @@ pub fn detect_commands(commands:Vec<Vec<String>>) {
                 "gt" => gt(&commands[index], index, &mut returns),
                 "help" | "?" => help(),
                 "exit" | "quit" | "bye" => exit(&commands[index], index, &mut returns),
+                "getenv" | "get" => getenv(&commands[index], index, &mut returns),
+                "setenv" | "set" => setenv(&commands[index], index, &mut returns),
                 "next" | "end" => stop=false,
                 "else" => command_else(&mut index, &mut returns, &commands, &mut stop),
                 "then" => then(&mut index, &mut returns, &commands, &mut stop),
@@ -135,95 +135,6 @@ fn runcommand(args:&[String], index:usize, returns:&mut HashMap<usize, CommandSt
     }
     // Flush stdout
     io::stdout().flush().unwrap();
-}
-
-
-pub fn jump_to_end(index:&mut usize, is_already_inside_cmp_operator:u8, status:bool, stop:&mut bool, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>]) {
-    /*
-    Find "END" keyword and save it's position
-    TIP: There can be multiple END keywords after "THEN". Comparison operations can be nested like in the example below:
-
-    test ad /test then
-        say "Operation succeeded!"
-        test ( math 1+1 = 2 ) then
-            say "It is equal"
-        end
-    end
-     */
-    let mut level = is_already_inside_cmp_operator;
-    let mut index_of_end = 0;
-    for (i,c) in commands[*index+1..].iter().enumerate() {
-        if NESTABLE_OPERATORS.contains(&c[0].as_str()) {
-            level+=1;
-        }
-        if END_LOGIC.contains(&c[0].as_str()) || &c[0] == "else" {
-            level-=1;
-        }
-        if level == 0 {
-            index_of_end=*index+i;
-            break;
-        }
-        if *index+i == commands.len()-1 && !NESTABLE_OPERATORS.contains(&c[0].as_str()) && level != 0 {
-            report_failure(*index, returns);
-            // Tell detect_commands() that it can't execute commands anymore
-            *stop=true;
-            return;
-        }
-    }
-
-    if status {
-        report_success(*index, returns);
-    }
-    else {
-        *index=index_of_end;
-    }
-    
-}
-
-// This function goes back in commands history to find closest comparison operator like "TEST"
-// If that found operator reported "success", find "END" and jump straight to that.
-// Don't do anything between "ELSE" and "END" or another "ELSE".
-// otherwise, (so if previous operator failed) try launching all commands until next "END" or "ELSE"
-fn command_else(index_of_else:&mut usize, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>], stop:&mut bool) {
-    if *index_of_else == 0 {
-        eprintln!("SYNTAX ERROR! Operator \"ELSE\" doesn't work when there is nothing before it!");
-        report_failure(*index_of_else, returns);
-        *stop=true;
-    }
-    if *index_of_else == commands.len()-1 {
-        eprintln!("SYNTAX ERROR! Operator \"ELSE\" doesn't work when there is nothing after it!");
-        report_failure(*index_of_else, returns);
-        *stop=true;
-    }
-
-    // Look for the nearest possible previous comparison operator
-    let mut index_of_nearest_cmp_operator = *index_of_else-1;
-    loop {
-        if CMP_OPERATORS.contains(&commands[index_of_nearest_cmp_operator][0].as_str()) {
-            break;
-        }
-        if index_of_nearest_cmp_operator == 0 && !CMP_OPERATORS.contains(&commands[index_of_nearest_cmp_operator][0].as_str()) {
-            eprintln!("SYNTAX ERROR! Operator \"ELSE\" is NOT preceded by any comparison operator!");
-            report_failure(*index_of_else, returns);
-            *stop=true;
-            break;
-        }
-        index_of_nearest_cmp_operator -= 1;
-    }
-
-    // Check if previous cmp operator succeeded
-    let status_of_cmp_operator = if returns.contains_key(&index_of_nearest_cmp_operator) {
-        returns.get(&index_of_nearest_cmp_operator).unwrap().success
-    }
-    else {
-        eprintln!("OPERATOR \"ELSE\" FAILED! Unable to read exit code of the previous comparison operator!");
-        *stop=true;
-        false
-    };
-    // Do the test - jump to "END" or "ELSE" if needed
-    jump_to_end(index_of_else, 0, !status_of_cmp_operator, stop, returns, commands);
-
-
 }
 
 fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>], stop:&mut bool) {

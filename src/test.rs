@@ -3,8 +3,13 @@ use std::os::unix::process::ExitStatusExt;
 use std::process::{self, Stdio};
 use carrot_libs::args;
 
+// So the motherfucking solution from gt.rs to use "use crate::helpful" doesn't work here.
+// Oh my god - DON'T use this file as a module! It is defined as a binary in cargo!
+
+// Normally, the rush.rs would do the "mod" work but test.rs is not imported in it so we need need to
+// reinitialize it here. Dumb but I kind off understand.
 mod helpful;
-use helpful::*;
+use crate::helpful::*;
 
 const SPLIT_COMMANDS:[&str;3] = ["and", "or", "not"];
 //const CMP_OPERATORS:[&str;1] = rush::CMP_OPERATORS;

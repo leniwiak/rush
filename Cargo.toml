@@ -23,10 +23,15 @@ rand = "0.8.4"
 [dependencies.carrot_libs]
 path = "../carrot-libs"
 
-[[bin]]
-name = "test"
-path = "src/test.rs"
 
 [[bin]]
 name = "rush"
 path = "src/rush.rs"
+
+[[bin]]
+name = "sleep"
+path = "src/sleep.rs"
+
+[[bin]]
+name = "test"
+path = "src/test.rs"
