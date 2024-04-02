@@ -1,6 +1,6 @@
 [package]
 name = "rush"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [build]
@@ -23,6 +23,9 @@ rand = "0.8.4"
 [dependencies.carrot_libs]
 path = "../carrot-libs"
 
+[[bin]]
+name = "cmp"
+path = "src/cmp.rs"
 
 [[bin]]
 name = "rush"

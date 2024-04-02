@@ -16,34 +16,41 @@
 
 - *: Break code to multiple parts
 - IF: Rename to 'TEST'
+
+### Added on 02.04.2024
+
 - UNTIL: Wait for keypress
 - SLEEP: Add new command that will stop command execution for some time
 - GETENV, SETENV: Ability to view and modify simple variables
-
-### Waiting features:
-
-- RUSH: Deal with char boundaries
+- RUSH: Deal with char boundaries (The bug was caused by dependency: carrot-libs/libinput!)
 
 # Release 0.3.0:
 
+### Added on 02.04.2024
+
+- RUSH: More supported shortcuts due to the changes made in libinput in carrot-libs
+- CMP: Ability to compare text and numeric values.
+
 ### Waiting features:
 
-- RUSH: History
-- RUSH: Aliases
-- RUSH: Support keys: DEL, ARROW_UP, ARROW_DOWN, etc.
+- CMP: Ability to compare outputs from any variable or command
+- MATH: Do the math stuff
+- WHILE: LOOP, MATCH, FOR: More logic operations
+- BREAK: Quit from the loop
 
 # Release 0.3.1:
 
 ### Waiting features:
 
-- RUSH: Ability to compare variables, files, numbers, etc.
-- WHILE, LOOP, MATCH, FOR: More logic operations
-- BREAK: Quit from the loop
+- RUSH: Aliases
+- RUSH: History storing and browsing
 
 # Release unknown:
 
 - RUSH: Restricted shell mode
 - RUSH: Run files (scripts) passed as arguments from CLI
+- RUSH: Comments
+- RUSH: Functions
 - RUSH: Pipes
 - RUSH: Ability to redirect command's output to a file
 - RUSH: Arrays, dictionaries
