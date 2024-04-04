@@ -32,8 +32,13 @@
 - CMP: Ability to compare text and numeric values.
 - RUSH: Initial support for "$varname" syntax
 
+### Added on 04.04.2024
+
+- RUSH: Support for keywords starting with "$"
+
 ### Waiting features:
 
+- RUSH: Avoid word splitting when words are enclosed in "" or ''
 - CMP: Ability to compare outputs from any variable or command
 - MATH: Do the math stuff
 - WHILE: LOOP, MATCH, FOR: More logic operations

@@ -41,16 +41,21 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
     // First of all, when there's a word that starts with "$"
     // replace it with variable contents
     let mut i = 0;
-    // todo - add some comments here
     while i < words.len() {
-        let w = words[i].clone();
-        if let Some(w) = w.strip_prefix('$') {
+        // Save currently tested word to "w"
+        let w = &words[i];
+        // Remove unnecessary prefix ($varname -> varname)
+        let sp = w.strip_prefix("$");
+        // If contents of "w" are not empty, replace word with variable contents
+        if let Some(w) = sp {
+            // Get variable contents
             let variable_contents=env::var_os(w).unwrap_or_default();
-
+            // Remove current command
             words.remove(i);
+            // Append contents of a variable
             words.insert(i, variable_contents.into_string().unwrap_or_default());
-            i += 1;
         }
+        i += 1;
     };
         
     let mut command = Vec::new();
