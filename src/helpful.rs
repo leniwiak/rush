@@ -60,139 +60,11 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
         i += 1;
     };
    
-    // Find words enclosed in quotes
-    let mut index = 0;
-    // This is where ranges of words will be stored for those that are inside quotes
-    // EDIT: Look for comments inside nearest while loop
-    let mut quote_positions = Vec::new();
-    let mut quote_starting_points = Vec::new();
-    let mut quote_ending_points = Vec::new();
-    let mut start_quote = None;
-    let mut end_quote = None;
-
-    while index < words.len() {
-        // Save position of starting/ending quotes
-        if words[index].starts_with('\'') || words[index].starts_with('"') { start_quote=Some(index); }
-        if words[index].ends_with('\'') || words[index].ends_with('"') { end_quote=Some(index+1); }
-
-        // If both, starting and ending positions are defined, add them to quote_positions
-        if start_quote.is_some() && end_quote.is_some() {
-            // I've lost my patience
-            // Instead of list containing ranges of enquoted words, just make a list with
-            // EVERY possible number containing identifiers of enquoted words
-            // Old structure: [[1..3], [4..9], [35,45]]
-            // New structure: [1,2,3,4,5,6,7,8,9,35,36,37,38,39,40, ..., you get the point]
-            // Another funny thing: My program needs to know where another quote is starting/ending
-            // the easiest way to do it now is to create another list with all quotation starting points
-            // Example: Starting points [1, 4, 35], ending points [3, 9, 45]
-            quote_starting_points.push(start_quote.unwrap());
-            quote_ending_points.push(end_quote.unwrap());
-            for i in start_quote.unwrap()..end_quote.unwrap() {
-                quote_positions.push(i);
-            }
-            start_quote = None;
-            end_quote = None;
-        }
-        index+=1;
-        // Searching for enquoted words is finished. If there is any quote left, throw syntax
-        // error.
-        if index == words.len() && (start_quote.is_some() && end_quote.is_none()) {
-            eprintln!("SYNTAX ERROR! There are unclosed quotes in your input!");
-        }
-    }
-
-    let mut quoted = false;
-    let mut natychmiast_wypierdalaj = false;
     // Split commands in place of any built-in command
     let mut index = 0;
     while index < words.len() {
-        if natychmiast_wypierdalaj {
-            break;
-        }
-        // If currently tested word is a part of enquoted sentence,
-        // add the entire quote contents to 'commands' without any spacing between words
-        // then jump to words after current quote.
-        if quote_positions.contains(&index) {
-            println!("Tutaj {index}");
-            quoted=true;
-            if quote_starting_points.contains(&index) {
-                let mut inner_index = index;
-                // Get all the enquoted words until end of nearest quote is found
-                let mut joined = String::new();
-                loop {
-                    joined.push_str(&words[inner_index]);
-                    inner_index+=1;
-                    println!("Hallo {inner_index}");
-                    if !quote_ending_points.contains(&inner_index) {
-                        index=inner_index+1;
-                        break;
-                    }
-                }
-                // Add entire, enquoted text to 'commands' list
-                commands.push(Vec::from([joined]));
-            }
-            else {
-                quoted=false;
-            }
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-            // KURWA!
-        }
         // If built-in keyword appears
-        else if spliting_keywords.contains(&words[index].as_str()) && !quoted {
+        if spliting_keywords.contains(&words[index].as_str()) {
             // Separate CURRENT keyword from PREVIOUSLY collected words
             // Expected output: ('af' 'file'), ('then' 'ad' 'dir')
             let (before_keyword, right) = words.split_at(index);
@@ -222,7 +94,7 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
             index = 0;
         }
         // If there are no built-in commands
-        else if !spliting_keywords.contains(&words[index].as_str()) && !quoted {
+        else if !spliting_keywords.contains(&words[index].as_str()) {
             // Just add the words to the 'command' variable
             command.push(words[index].clone());
             index += 1;
@@ -231,7 +103,7 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
                 commands.push(words.clone());
             }
         };
-    };
+    }
 
     println!("Tu powinno nakurwiać");
     dbg!(&commands);
