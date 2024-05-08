@@ -44,12 +44,14 @@
 - WHILE: LOOP, MATCH, FOR: More logic operations
 - BREAK: Quit from the loop
 
-# Release 0.3.1:
+# Release 0.4.0:
 
 ### Waiting features:
 
 - RUSH: Aliases
 - RUSH: History storing and browsing
+- RANDOM: Generate random numbers
+- SAY: Print text to the terminal
 
 # Release unknown:
 
