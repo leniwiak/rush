@@ -66,26 +66,23 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
     while index < words.len() {
         // Word starts with a quote
         if words[index].starts_with('\'') || words[index].starts_with('"') {
-            loop {
-                // Build one large argument from words in quotes
-                let mut joined = String::new();
-                // Remove quotes from word, if any
+            // Build one large argument from words in quotes
+            let mut joined = String::new();
+            // Remove quotes from word, if any
+            let stripped_word = strip_quotes(&words[index]);
+            // Add word to 'joined' with additional space at the end
+            joined.push_str(&format!("{} ", stripped_word));
+            // Remove current word from 'words' list. We no longer need it since it is added to 'joined'.
+            words.remove(index);
+            // If we find the end of quotation
+            if words[index].ends_with('\'') || words[index].ends_with('"') {
+                // Add final word to 'joined'
                 let stripped_word = strip_quotes(&words[index]);
-                // Add word to 'joined' with additional space at the end
-                joined.push_str(&format!("{} ", stripped_word));
-                // Remove current word from 'words' list. We no longer need it since it is added to 'joined'.
+                joined.push_str(&stripped_word); // TIP: Space at the end of the word is no longer needed ;)
+                // Remove final word from 'words'
                 words.remove(index);
-                // If we find the end of quotation
-                if words[index].ends_with('\'') || words[index].ends_with('"') {
-                    // Add final word to 'joined'
-                    let stripped_word = strip_quotes(&words[index]);
-                    joined.push_str(&stripped_word); // TIP: Space at the end of the word is no longer needed ;)
-                    // Remove final word from 'words'
-                    words.remove(index);
-                    // Add all collected words in quotes, stored in 'joined' to 'words' 
-                    words.push(joined);
-                    break;
-                }
+                // Add all collected words in quotes, stored in 'joined' to 'words' 
+                words.insert(index, joined);
             }
         }
         // If built-in keyword appears

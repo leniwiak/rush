@@ -39,7 +39,7 @@
 ### Added on 09.04.2024
 
 - RUSH: Avoid word splitting when words are enclosed in "" or ''
-- RUSH: Known bug - Words in quotes are always added to the command as the last
+- RUSH: Known bug - Words in quotes are always added to the command as the last (Fixed!)
 - RUSH: Known bug - Shell is not testing if quotes are properly ended or not
 - CMP: Ability to compare with command's stdout, stderr or exit code. It'll also work with variables because the shell itself is responsible for replacing text starting with a dollar sign with a variable contents.
 
