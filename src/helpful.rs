@@ -63,24 +63,31 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
     // Split commands in place of any built-in command
     let mut index = 0;
     while index < words.len() {
-        println!("Jebany index jest ustawiony na {index}");
+        println!("INDEX: {index}");
         // Word starts with a quote
         if words[index].starts_with('\'') || words[index].starts_with('"') {
             println!("To słowo zaczyna się od cudzysłowXXX chuj wie");
-            // Build one large argument containing all the words in quotes
             loop {
                 // Build one large argument from words in quotes
                 let mut joined = String::new();
-                println!("Dodaję {} do joined", words[index]);
-                joined.push_str(&words[index]);
+                // Remove quotes from word, if any
+                let stripped_word = strip_quotes(&words[index]);
+                println!("Dodaję {} do joined", stripped_word);
+                // Add word to 'joined' with additional space at the end
+                joined.push_str(&format!("{} ", stripped_word));
+                // Remove current word from 'words' list. We no longer need it since it is added to 'joined'.
                 words.remove(index);
+                // If we find the end of quotation
                 if words[index].ends_with('\'') || words[index].ends_with('"') {
-                    println!("Słowo {} o indeskie {index} kończy cudzysłów", words[index]);
-                    joined.push_str(&words[index]);
+                    // Add final word to 'joined'
+                    let stripped_word = strip_quotes(&words[index]);
+                    println!("Słowo {} o indeksie {index} kończy cudzysłów", stripped_word);
+                    joined.push_str(&stripped_word); // TIP: Space at the end of the word is no longer needed ;)
+                    // Remove final word from 'words'
                     words.remove(index);
-                    commands.push(Vec::from([joined]));
-                    println!("Dodaję joined do commands");
-                    dbg!(index);
+                    // Add all collected words in quotes, stored in 'joined' to 'words' 
+                    words.push(joined);
+                    println!("Dodaję joined do words");
                     break;
                 }
             }
@@ -118,14 +125,13 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
         }
         // If there are no built-in commands
         else if !spliting_keywords.contains(&words[index].as_str()) && !words[index].starts_with('\'') && !words[index].starts_with('"') {
-            println!("Normal word: {index}: {}", words[index]);
+            println!("Normal word {index}: {}", words[index]);
             // Just add the words to the 'command' variable
             command.push(words[index].clone());
-            index += 1;
+            index+=1;
             // No more words? 
-            // Next word is enquoed?
-            // Add them to 'commands'.
-            if index == words.len() || words[index].starts_with('\'') || words[index].starts_with('"') {
+            if index == words.len() {
+                // Add collected words to 'commands'.
                 commands.push(words[..index].to_vec());
             }
         };
@@ -135,4 +141,24 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
     dbg!(&commands);
 
     commands
+}
+
+fn strip_quotes(input:&str) -> String {
+    let mut output = input.to_string();
+    println!("Otrzymałem słowo do skrócenia: {input}");
+    if output.starts_with('\'') {
+        output = output.strip_prefix('\'').unwrap().to_string();
+    }
+    if output.starts_with('"') {
+        output = output.strip_prefix('"').unwrap().to_string();
+    }
+
+    if output.ends_with('\'') {
+        output = output.strip_suffix('\'').unwrap().to_string();
+    }
+    if output.ends_with('"'){
+        output = output.strip_suffix('"').unwrap().to_string();
+    }
+    println!("Otrzymano: {output}");
+    output
 }
