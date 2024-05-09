@@ -1,7 +1,7 @@
 use std::thread;
 use std::time;
 use std::process;
-mod helpful;
+// This is how to import other files from rush when the current source file is NOT imported in "rush.rs"
 use carrot_libs::args;
 
 fn main() {

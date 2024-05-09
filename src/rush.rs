@@ -119,7 +119,7 @@ fn runcommand(args:&[String], index:usize, returns:&mut HashMap<usize, CommandSt
     // using process::Command::new().args().status();
     match process::Command::new(&args[0]).args(&args[1..]).status() { 
         Err(e) => {
-            eprintln!("{}: Command execution failed because of an error: {}", args[0], e.kind());
+            eprintln!("{}: Command execution failed: {:?}", args[0], e.kind());
             report_failure(index, returns)
         },
         Ok(process) => {

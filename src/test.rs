@@ -2,12 +2,7 @@ use std::collections::HashMap;
 use std::os::unix::process::ExitStatusExt;
 use std::process::{self, Stdio};
 use carrot_libs::args;
-
-// So the motherfucking solution from gt.rs to use "use crate::helpful" doesn't work here.
-// Oh my god - DON'T use this file as a module! It is defined as a binary in cargo!
-
-// Normally, the rush.rs would do the "mod" work but test.rs is not imported in it so we need need to
-// reinitialize it here. Dumb but I kind off understand.
+// This is how to import other rush files when the current source file is defined as binary in Cargo.toml
 mod helpful;
 use crate::helpful::*;
 

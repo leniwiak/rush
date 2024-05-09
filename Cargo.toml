@@ -23,6 +23,9 @@ rand = "0.8.4"
 [dependencies.carrot_libs]
 path = "../carrot-libs"
 
+# Quick note for future me - SETENV and GETENV are NOT MEANT to be binaries!
+# NEVER EVER try to add them here!
+
 [[bin]]
 name = "cmp"
 path = "src/cmp.rs"

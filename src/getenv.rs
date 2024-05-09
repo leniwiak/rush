@@ -1,6 +1,7 @@
 use std::env::var_os;
 use std::ffi::OsString;
 use std::collections::HashMap;
+// This is how to import other files from rush when the current source file is imported in "rush.rs"
 use crate::helpful::*;
 
 pub fn getenv(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {

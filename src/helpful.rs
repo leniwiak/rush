@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::env;
+use std::process;
 
 #[derive(Debug)]
  pub struct CommandStatus {
@@ -63,16 +64,13 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
     // Split commands in place of any built-in command
     let mut index = 0;
     while index < words.len() {
-        println!("INDEX: {index}");
         // Word starts with a quote
         if words[index].starts_with('\'') || words[index].starts_with('"') {
-            println!("To słowo zaczyna się od cudzysłowXXX chuj wie");
             loop {
                 // Build one large argument from words in quotes
                 let mut joined = String::new();
                 // Remove quotes from word, if any
                 let stripped_word = strip_quotes(&words[index]);
-                println!("Dodaję {} do joined", stripped_word);
                 // Add word to 'joined' with additional space at the end
                 joined.push_str(&format!("{} ", stripped_word));
                 // Remove current word from 'words' list. We no longer need it since it is added to 'joined'.
@@ -81,20 +79,17 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
                 if words[index].ends_with('\'') || words[index].ends_with('"') {
                     // Add final word to 'joined'
                     let stripped_word = strip_quotes(&words[index]);
-                    println!("Słowo {} o indeksie {index} kończy cudzysłów", stripped_word);
                     joined.push_str(&stripped_word); // TIP: Space at the end of the word is no longer needed ;)
                     // Remove final word from 'words'
                     words.remove(index);
                     // Add all collected words in quotes, stored in 'joined' to 'words' 
                     words.push(joined);
-                    println!("Dodaję joined do words");
                     break;
                 }
             }
         }
         // If built-in keyword appears
         else if spliting_keywords.contains(&words[index].as_str()) && !words[index].starts_with('\'') && !words[index].starts_with('"') {
-            println!("Found keyword");
             // Separate CURRENT keyword from PREVIOUSLY collected words
             // Expected output: ('af' 'file'), ('then' 'ad' 'dir')
             let (before_keyword, right) = words.split_at(index);
@@ -137,15 +132,14 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
         };
     }
 
-    println!("Tu powinno nakurwiać");
+    println!("DEBUG COMMANDS:");
     dbg!(&commands);
 
     commands
 }
 
-fn strip_quotes(input:&str) -> String {
+pub fn strip_quotes(input:&str) -> String {
     let mut output = input.to_string();
-    println!("Otrzymałem słowo do skrócenia: {input}");
     if output.starts_with('\'') {
         output = output.strip_prefix('\'').unwrap().to_string();
     }
@@ -159,6 +153,26 @@ fn strip_quotes(input:&str) -> String {
     if output.ends_with('"'){
         output = output.strip_suffix('"').unwrap().to_string();
     }
-    println!("Otrzymano: {output}");
     output
+}
+
+// This will be used to execute commands and get it's contents!
+pub fn cmd_content(args:&[String]) -> process::Output {
+    // Do nothing if nothing was requested
+    // This might occur when the user presses ENTER without even typing anything
+    if args.is_empty() || args[0].is_empty() {
+        print!("");
+    }
+    // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and get it's status
+    // using process::Command::new().args().status();
+    match process::Command::new(&args[0]).args(&args[1..]).output() { 
+        Err(e) => {
+            eprintln!("{}: Command execution failed: {:?}", args[0], e.kind());
+            process::exit(1);
+        },
+        Ok(process) => {
+            // If the command is possible to run, save it's status to "returns" variable
+            process
+        },
+    }
 }

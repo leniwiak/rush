@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+// This is how to import other files from rush when the current source file is imported in "rush.rs"
 use crate::helpful::*;
 use crate::end::*;
 
