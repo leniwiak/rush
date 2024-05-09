@@ -63,8 +63,31 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
     // Split commands in place of any built-in command
     let mut index = 0;
     while index < words.len() {
+        println!("Jebany index jest ustawiony na {index}");
+        // Word starts with a quote
+        if words[index].starts_with('\'') || words[index].starts_with('"') {
+            println!("To słowo zaczyna się od cudzysłowXXX chuj wie");
+            // Build one large argument containing all the words in quotes
+            loop {
+                // Build one large argument from words in quotes
+                let mut joined = String::new();
+                println!("Dodaję {} do joined", words[index]);
+                joined.push_str(&words[index]);
+                words.remove(index);
+                if words[index].ends_with('\'') || words[index].ends_with('"') {
+                    println!("Słowo {} o indeskie {index} kończy cudzysłów", words[index]);
+                    joined.push_str(&words[index]);
+                    words.remove(index);
+                    commands.push(Vec::from([joined]));
+                    println!("Dodaję joined do commands");
+                    dbg!(index);
+                    break;
+                }
+            }
+        }
         // If built-in keyword appears
-        if spliting_keywords.contains(&words[index].as_str()) {
+        else if spliting_keywords.contains(&words[index].as_str()) && !words[index].starts_with('\'') && !words[index].starts_with('"') {
+            println!("Found keyword");
             // Separate CURRENT keyword from PREVIOUSLY collected words
             // Expected output: ('af' 'file'), ('then' 'ad' 'dir')
             let (before_keyword, right) = words.split_at(index);
@@ -94,13 +117,16 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
             index = 0;
         }
         // If there are no built-in commands
-        else if !spliting_keywords.contains(&words[index].as_str()) {
+        else if !spliting_keywords.contains(&words[index].as_str()) && !words[index].starts_with('\'') && !words[index].starts_with('"') {
+            println!("Normal word: {index}: {}", words[index]);
             // Just add the words to the 'command' variable
             command.push(words[index].clone());
             index += 1;
-            // No more words? Add them to 'commands'.
-            if index == words.len() {
-                commands.push(words.clone());
+            // No more words? 
+            // Next word is enquoed?
+            // Add them to 'commands'.
+            if index == words.len() || words[index].starts_with('\'') || words[index].starts_with('"') {
+                commands.push(words[..index].to_vec());
             }
         };
     }
