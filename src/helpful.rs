@@ -3,6 +3,8 @@
 use std::collections::HashMap;
 use std::env;
 use std::process;
+use signal_hook::{consts::SIGINT, iterator::Signals};
+use std::thread;
 
 #[derive(Debug)]
  pub struct CommandStatus {
@@ -179,6 +181,17 @@ pub fn cmd_content(args:&[String]) -> process::Output {
     if args.is_empty() || args[0].is_empty() {
         print!("");
     }
+
+    // Create a new thread waitinh for SIGINT
+    let mut signals = Signals::new([SIGINT]).unwrap();
+    thread::spawn(move || {
+        for sig in signals.forever() {
+            if sig == 2 {
+                return;
+            }
+        }
+    });
+    
     // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and get it's status
     // using process::Command::new().args().status();
     match process::Command::new(&args[0]).args(&args[1..]).output() { 

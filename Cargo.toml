@@ -19,6 +19,7 @@ directory = "vendor"
 [dependencies]
 libc = "*"
 rand = "0.8.4"
+signal-hook = "*"
 
 [dependencies.carrot_libs]
 path = "../carrot-libs"

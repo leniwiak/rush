@@ -6,6 +6,8 @@ use std::os::unix::process::ExitStatusExt;
 use std::process;
 use std::env;
 use std::collections::HashMap;
+use signal_hook::{consts::SIGINT, iterator::Signals};
+use std::thread;
 use carrot_libs::args;
 use carrot_libs::input;
 
@@ -92,6 +94,7 @@ pub fn detect_commands(commands:Vec<Vec<String>>) {
                 "next" | "end" => stop=false,
                 "else" => command_else(&mut index, &mut returns, &commands, &mut stop),
                 "then" => then(&mut index, &mut returns, &commands, &mut stop),
+                "exec" => runcommand(&commands[index], index, &mut returns),
                 _ => runcommand(&commands[index], index, &mut returns)
             };
             if index < commands.len() {
@@ -115,6 +118,17 @@ fn runcommand(args:&[String], index:usize, returns:&mut HashMap<usize, CommandSt
     if args.is_empty() || args[0].is_empty() {
         print!("");
     }
+
+    // Create a new thread waitinh for SIGINT
+    let mut signals = Signals::new([SIGINT]).unwrap();
+    thread::spawn(move || {
+        for sig in signals.forever() {
+            if sig == 2 {
+                return;
+            }
+        }
+    });
+
     // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and get it's status
     // using process::Command::new().args().status();
     match process::Command::new(&args[0]).args(&args[1..]).status() { 

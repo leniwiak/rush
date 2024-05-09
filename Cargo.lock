@@ -178,6 +178,7 @@ dependencies = [
  "carrot_libs",
  "libc",
  "rand",
+ "signal-hook",
 ]
 
 [[package]]
