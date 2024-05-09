@@ -68,64 +68,83 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
         if words[index].starts_with('\'') || words[index].starts_with('"') {
             // Build one large argument from words in quotes
             let mut joined = String::new();
-            // Remove quotes from word, if any
-            let stripped_word = strip_quotes(&words[index]);
-            // Add word to 'joined' with additional space at the end
-            joined.push_str(&format!("{} ", stripped_word));
-            // Remove current word from 'words' list. We no longer need it since it is added to 'joined'.
-            words.remove(index);
-            // If we find the end of quotation
-            if words[index].ends_with('\'') || words[index].ends_with('"') {
-                // Add final word to 'joined'
+            loop {
+                // Remove quotes from word, if any
                 let stripped_word = strip_quotes(&words[index]);
-                joined.push_str(&stripped_word); // TIP: Space at the end of the word is no longer needed ;)
-                // Remove final word from 'words'
+                println!("Got stripped word: {}", stripped_word);
+                // Add word to 'joined' with additional space at the end
+                joined.push_str(&format!("{} ", stripped_word));
+                println!("Joined contents: {joined}");
+                // If we find the end of quotation
+                if words[index].ends_with('\'') || words[index].ends_with('"') {
+                    // Add final word to 'joined'
+                    println!("Index {index}: Word {} is ending a quote", words[index]);
+                    joined = joined.strip_suffix(' ').unwrap().to_string(); // TIP: Space at the end of the word is no longer needed ;)
+                    println!("Joined contents: {joined}");
+                    // Remove final word from 'words'
+                    if !words.is_empty() {
+                        words.remove(index);
+                    }
+                    // Add all collected words in quotes, stored in 'joined' to 'words' 
+                    words.insert(index, joined);
+                    println!("Current index is: {}", index);
+                    println!("Words lenght is: {}", words.len());
+                    dbg!(index+1==words.len());
+                    // No more words? 
+                    if index+1 == words.len() {
+                        // Add collected words to 'commands'.
+                        commands.push(words[..index+1].to_vec());
+                    }
+                    break;
+                }
+                // Remove current word from 'words' list. We no longer need it since it is added to 'joined'.
                 words.remove(index);
-                // Add all collected words in quotes, stored in 'joined' to 'words' 
-                words.insert(index, joined);
             }
-        }
-        // If built-in keyword appears
-        else if spliting_keywords.contains(&words[index].as_str()) && !words[index].starts_with('\'') && !words[index].starts_with('"') {
-            // Separate CURRENT keyword from PREVIOUSLY collected words
-            // Expected output: ('af' 'file'), ('then' 'ad' 'dir')
-            let (before_keyword, right) = words.split_at(index);
-            // Convert everything to a vector
-            let (before_keyword, right) = (before_keyword.to_vec(), right.to_vec());
-
-            // Separate keyword from NEXT words, that are not collected yet
-            // Expected output: ('af' 'file'), ('then'), ('ad' 'dir')
-            let (keyword, after_keyword) = {
-                let (keyword, after_keyword) = right.split_at(1);
-                (keyword.to_vec(), after_keyword.to_vec())
-            };
-
-            // Send previous words to "commands"
-            // Example: ('af' 'file')
-            if !before_keyword.is_empty() {
-                // Do not append anything if there is nothing before keyword!
-                commands.push(before_keyword.to_vec());
-            }
-            // Send keyword to "commands" exclusively
-            // Example: ('then')
-            commands.push(keyword.to_vec());
-            // We no longer need to deal with ('af' 'file') and ('then') so remove them from words
-            words = after_keyword.to_vec();
-            // Start over with new words
-            // Example: ('ad' 'dir')
-            index = 0;
-        }
-        // If there are no built-in commands
-        else if !spliting_keywords.contains(&words[index].as_str()) && !words[index].starts_with('\'') && !words[index].starts_with('"') {
-            println!("Normal word {index}: {}", words[index]);
-            // Just add the words to the 'command' variable
-            command.push(words[index].clone());
             index+=1;
-            // No more words? 
-            if index == words.len() {
-                // Add collected words to 'commands'.
-                commands.push(words[..index].to_vec());
+        } else {
+            // If built-in keyword appears
+            if spliting_keywords.contains(&words[index].as_str()) {
+                println!("Index {index}: Word {} looks like a built-in keyword.", words[index]);
+                // Separate CURRENT keyword from PREVIOUSLY collected words
+                // Expected output: ('af' 'file'), ('then' 'ad' 'dir')
+                let (before_keyword, right) = words.split_at(index);
+                // Convert everything to a vector
+                let (before_keyword, right) = (before_keyword.to_vec(), right.to_vec());
+
+                // Separate keyword from NEXT words, that are not collected yet
+                // Expected output: ('af' 'file'), ('then'), ('ad' 'dir')
+                let (keyword, after_keyword) = {
+                    let (keyword, after_keyword) = right.split_at(1);
+                    (keyword.to_vec(), after_keyword.to_vec())
+                };
+
+                // Send previous words to "commands"
+                // Example: ('af' 'file')
+                if !before_keyword.is_empty() {
+                    // Do not append anything if there is nothing before keyword!
+                    commands.push(before_keyword.to_vec());
+                }
+                // Send keyword to "commands" exclusively
+                // Example: ('then')
+                commands.push(keyword.to_vec());
+                // We no longer need to deal with ('af' 'file') and ('then') so remove them from words
+                words = after_keyword.to_vec();
+                // Start over with new words
+                // Example: ('ad' 'dir')
+                index = 0;
             }
+            // If there are no built-in commands
+            else if !spliting_keywords.contains(&words[index].as_str()) {
+                println!("Index {index}: Word {} looks like a normal word.", words[index]);
+                // Just add the words to the 'command' variable
+                command.push(words[index].clone());
+                index+=1;
+                // No more words? 
+                if index == words.len() {
+                    // Add collected words to 'commands'.
+                    commands.push(words[..index].to_vec());
+                }
+            };
         };
     }
 

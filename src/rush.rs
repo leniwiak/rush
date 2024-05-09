@@ -142,11 +142,13 @@ fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, c
         eprintln!("SYNTAX ERROR! Operator \"THEN\" doesn't work when there is nothing before it!");
         report_failure(*index_of_then, returns);
         *stop=true;
+        return;
     }
     if *index_of_then == commands.len()-1 {
         eprintln!("SYNTAX ERROR! Operator \"THEN\" doesn't work when there is nothing after it!");
         report_failure(*index_of_then, returns);
         *stop=true;
+        return;
     }
     // Compare exit status of previous and following commands
     let prev_index = *index_of_then-1;
