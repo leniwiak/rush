@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::os::unix::process::ExitStatusExt;
 use std::process::{self, Stdio};
+use signal_hook::{consts::SIGINT, iterator::Signals};
+use std::thread;
 use carrot_libs::args;
 // This is how to import other rush files when the current source file is defined as binary in Cargo.toml
 mod helpful;
@@ -73,6 +75,16 @@ fn main() {
 }
 
 fn silent_exec(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+    // Create a new thread waitinh for SIGINT
+    let mut signals = Signals::new([SIGINT]).unwrap();
+    thread::spawn(move || {
+        for sig in signals.forever() {
+            if sig == 2 {
+                return;
+            }
+        }
+    });
+
     // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and collect it's status to "returns"
     match process::Command::new(&args[0]).args(&args[1..]).stdout(Stdio::null()).status() { 
         Err(e) => {

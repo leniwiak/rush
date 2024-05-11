@@ -91,7 +91,7 @@ pub fn detect_commands(commands:Vec<Vec<String>>) {
                 "exit" | "quit" | "bye" => exit(&commands[index], index, &mut returns),
                 "getenv" | "get" => getenv(&commands[index], index, &mut returns),
                 "setenv" | "set" => setenv(&commands[index], index, &mut returns),
-                "next" | "end" => stop=false,
+                "end" => stop=false,
                 "else" => command_else(&mut index, &mut returns, &commands, &mut stop),
                 "then" => then(&mut index, &mut returns, &commands, &mut stop),
                 "exec" => runcommand(&commands[index], index, &mut returns),
@@ -124,7 +124,11 @@ fn runcommand(args:&[String], index:usize, returns:&mut HashMap<usize, CommandSt
     thread::spawn(move || {
         for sig in signals.forever() {
             if sig == 2 {
+                println!("SIGINT");
                 return;
+            } else {
+                println!("{sig}");
+
             }
         }
     });
@@ -174,6 +178,7 @@ fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, c
         *stop=true;
         false
     };
-    
+
+    // Go to the 'end' keyword
     jump_to_end(index_of_then, 1, prev_status, stop, returns, commands);
 }

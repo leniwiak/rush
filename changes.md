@@ -42,7 +42,7 @@
 - RUSH: Known bug - Words in quotes are always added to the command as the last (Fixed!)
 - RUSH: Fixed an issue that caused shell to panic when just "then" alone was request as a command
 - RUSH: Known bug - Shell is not testing if quotes are properly ended or not
-- RUSH: Killing child process with ctrl+c no longer kills parent process
+- RUSH: Killing child process with ctrl+c no longer kills parent process (Fixed!)
 - CMP: Ability to compare with command's stdout, stderr or exit code. It'll also work with variables because the shell itself is responsible for replacing text starting with a dollar sign with a variable contents.
 
 ### Waiting features:
