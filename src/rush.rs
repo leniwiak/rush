@@ -10,6 +10,8 @@ use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::thread;
 use carrot_libs::args;
 use carrot_libs::input;
+use confy;
+use serde_derive::{Deserialize, Serialize};
 
 mod helpful;
 mod gt;
@@ -19,6 +21,16 @@ mod setenv;
 mod test_lib;
 mod end;
 use {helpful::*, test_lib::*, getenv::*, setenv::*, end::*, gt::*, exit::*};
+
+#[derive(Serialize, Deserialize)]
+struct RushConfig {
+    prompt: String,
+}
+
+/// `MyConfig` implements `Default`
+impl ::std::default::Default for RushConfig {
+    fn default() -> Self { Self { prompt: "> ".into() } }
+}
 
 fn main() {
     let opts = args::opts();
@@ -59,7 +71,8 @@ fn init_input_mode() {
     env::set_var("?", "0");
     loop {
         // Get all space separated words from user
-        let console_input = input::get(String::from("> "));
+        let cfg:RushConfig = confy::load("rush", "rush").unwrap();
+        let console_input = input::get(cfg.prompt);
         // Separate commands from super commands
         let commands = split_commands(console_input, SPLIT_COMMANDS.to_vec());
         // Execute those commands

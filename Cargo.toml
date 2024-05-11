@@ -20,6 +20,9 @@ directory = "vendor"
 libc = "*"
 rand = "0.8.4"
 signal-hook = "*"
+confy = "*"
+serde = "*"
+serde_derive = "*"
 
 [dependencies.carrot_libs]
 path = "../carrot-libs"
