@@ -10,7 +10,6 @@ use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::thread;
 use carrot_libs::args;
 use carrot_libs::input;
-use confy;
 use serde_derive::{Deserialize, Serialize};
 
 mod helpful;

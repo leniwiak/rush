@@ -36,7 +36,7 @@
 
 - RUSH: Support for keywords starting with "$"
 
-### Added on 09.04.2024
+### Added on 09.05.2024
 
 - RUSH: Avoid word splitting when words are enclosed in "" or ''
 - RUSH: Known bug - Words in quotes are always added to the command as the last (Fixed!)
