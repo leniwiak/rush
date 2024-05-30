@@ -71,7 +71,13 @@ fn init_input_mode() {
     loop {
         // Get all space separated words from user
         let cfg:RushConfig = confy::load("rush", "rush").unwrap();
-        let console_input = input::get(cfg.prompt, false);
+        let console_input = match input::get(cfg.prompt, false) {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("Can't get user input: {e}");
+                process::exit(1);
+            }
+        };
         // Separate commands from super commands
         let commands = split_commands(console_input, SPLIT_COMMANDS.to_vec());
         // Execute those commands

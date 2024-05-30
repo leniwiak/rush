@@ -45,6 +45,11 @@
 - RUSH: Killing child process with ctrl+c no longer kills parent process (Fixed!)
 - CMP: Ability to compare with command's stdout, stderr or exit code. It'll also work with variables because the shell itself is responsible for replacing text starting with a dollar sign with a variable contents.
 
+
+# Release 0.3.1:
+
+### Added on 30.05.2024
+
 ### Waiting features:
 
 - MATH: Do the math stuff
