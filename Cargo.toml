@@ -43,5 +43,5 @@ name = "sleep"
 path = "src/sleep.rs"
 
 [[bin]]
-name = "test"
+name = "if"
 path = "src/test.rs"

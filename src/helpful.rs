@@ -15,12 +15,12 @@ use std::thread;
 }
 
 pub const SPLIT_COMMANDS:[&str;4] = ["then", "next", "end", "else"];
-pub const NESTABLE_OPERATORS:[&str;1] = ["test"];
-pub const CMP_OPERATORS:[&str;2] = ["test", "else"];
+pub const NESTABLE_OPERATORS:[&str;1] = ["if"];
+pub const CMP_OPERATORS:[&str;2] = ["if", "else"];
 pub const END_LOGIC:[&str;2] = ["end", "else"];
 
 // These functions will be used to report success or failure when built-in or super commands are running
-// This is usefull because typically we don't want the shell to abnormally quit when syntax of "test" statement is incorrect
+// This is usefull because typically we don't want the shell to abnormally quit when syntax of "if" statement is incorrect
 // Instead, we just want to say "Hey! There is a bug!"
 // BUT when rush would work as a subshell just to execute a script, we won't even need it anymore
 pub fn report_success(index:usize, returns:&mut HashMap<usize, CommandStatus>) {

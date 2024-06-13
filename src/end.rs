@@ -6,9 +6,9 @@ pub fn jump_to_end(index:&mut usize, is_already_inside_cmp_operator:u8, status:b
     Find "END" keyword and save it's position
     TIP: There can be multiple END keywords after "THEN". Comparison operations can be nested like in the example below:
 
-    test ad /test then
+    if ad /test then
         say "Operation succeeded!"
-        test ( math 1+1 = 2 ) then
+        if ( math 1+1 == 2 ) then
             say "It is equal"
         end
     end
@@ -20,16 +20,20 @@ pub fn jump_to_end(index:&mut usize, is_already_inside_cmp_operator:u8, status:b
         // If you find logic operator, bump up the 'level' variable
         // This means that there is probably another 'if' (or anything like that) which should
         // have it's own 'end'.
+        dbg!(level, "start");
         if NESTABLE_OPERATORS.contains(&c[0].as_str()) {
             level+=1;
+        dbg!(level, "hoho");
         }
         // Lower the 'level' when 'end' is found
         if END_LOGIC.contains(&c[0].as_str()) || &c[0] == "else" {
             level-=1;
             found_end_operators+=1;
+        dbg!(level, "hihh");
         }
         if level == 0 {
             index_of_end=*index+i;
+        dbg!(level, "hehe");
             break;
         }
         if *index+i == commands.len()-1 && !NESTABLE_OPERATORS.contains(&c[0].as_str()) && level != 0 {

@@ -48,12 +48,14 @@
 
 # Release 0.3.1:
 
-### Added on 30.05.2024
+### Added on 12.06.2024
+
+- TEST: Renamed back again to 'IF'. Don't know why I named it 'TEST' before. Such a stupid name.
 
 ### Waiting features:
 
 - MATH: Do the math stuff
-- WHILE: LOOP, MATCH, FOR: More logic operations
+- WHILE, LOOP, MATCH, FOR: More logic operations
 - BREAK: Quit from the loop
 
 # Release 0.4.0:
