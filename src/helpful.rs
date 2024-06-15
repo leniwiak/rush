@@ -3,6 +3,10 @@
 use std::collections::HashMap;
 use std::env;
 use std::process;
+use std::process::Stdio;
+use std::io;
+use std::io::Write;
+use std::os::unix::process::ExitStatusExt;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::thread;
 
@@ -14,8 +18,10 @@ use std::thread;
     pub core_dumped: bool 
 }
 
+// Commands that separate inline commands
 pub const SPLIT_COMMANDS:[&str;4] = ["then", "next", "end", "else"];
-pub const NESTABLE_OPERATORS:[&str;1] = ["if"];
+// Commands that can be nested. You can write IF inside of another IF.
+pub const NESTABLE_OPERATORS:[&str;2] = ["if", "loop"];
 pub const CMP_OPERATORS:[&str;2] = ["if", "else"];
 pub const END_LOGIC:[&str;2] = ["end", "else"];
 
@@ -31,7 +37,6 @@ pub fn report_failure(index:usize, returns:&mut HashMap<usize, CommandStatus>) {
     let command_status = CommandStatus {code: Some(1),success: false,signal: None,core_dumped: false};
     returns.insert(index, command_status);
 }
-
 
 pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec<Vec<String>> {
     // This list contains all commands passed by the user 
@@ -174,6 +179,50 @@ pub fn strip_quotes(input:&str) -> String {
     output
 }
 
+// This will be used to execute commands!
+pub fn runcommand(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+    // Do nothing if nothing was requested
+    // This might occur when the user presses ENTER without even typing anything
+    if args.is_empty() || args[0].is_empty() {
+        print!("");
+    }
+
+    // Create a new thread waitinh for SIGINT
+    let mut signals = Signals::new([SIGINT]).unwrap();
+    thread::spawn(move || {
+        for sig in signals.forever() {
+            if sig == 2 {
+                println!("SIGINT");
+                return;
+            } else {
+                println!("{sig}");
+
+            }
+        }
+    });
+
+    // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and get it's status
+    // using process::Command::new().args().status();
+    match process::Command::new(&args[0]).args(&args[1..]).status() { 
+        Err(e) => {
+            eprintln!("{}: Command execution failed: {:?}", args[0], e.kind());
+            report_failure(index, returns)
+        },
+        Ok(process) => {
+            // If the command is possible to run, save it's status to "returns" variable
+            let command_status = CommandStatus {
+                code: process.code(),
+                success: process.success(),
+                signal: process.signal(),
+                core_dumped: process.core_dumped()
+            };
+            returns.insert(index, command_status);
+        },
+    }
+    // Flush stdout
+    io::stdout().flush().unwrap();
+}
+
 // This will be used to execute commands and get it's contents!
 pub fn cmd_content(args:&[String]) -> process::Output {
     // Do nothing if nothing was requested
@@ -202,6 +251,36 @@ pub fn cmd_content(args:&[String]) -> process::Output {
         Ok(process) => {
             // If the command is possible to run, save it's status to "returns" variable
             process
+        },
+    }
+}
+
+pub fn silent_exec(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+    // Create a new thread waitinh for SIGINT
+    let mut signals = Signals::new([SIGINT]).unwrap();
+    thread::spawn(move || {
+        for sig in signals.forever() {
+            if sig == 2 {
+                return;
+            }
+        }
+    });
+
+    // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and collect it's status to "returns"
+    match process::Command::new(&args[0]).args(&args[1..]).stdout(Stdio::null()).status() { 
+        Err(e) => {
+            eprintln!("{}: Command execution failed because of an error: {}", args[0], e.kind());
+            report_failure(index, returns)
+        },
+        Ok(process) => {
+            // If the command is possible to run, save it's status to "returns" variable
+            let command_status = CommandStatus {
+                code: process.code(),
+                success: process.success(),
+                signal: process.signal(),
+                core_dumped: process.core_dumped()
+            };
+            returns.insert(index, command_status);
         },
     }
 }

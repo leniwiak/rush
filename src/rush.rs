@@ -1,13 +1,8 @@
 #![allow(dead_code)]
 
-use std::io;
-use std::io::Write;
-use std::os::unix::process::ExitStatusExt;
 use std::process;
 use std::env;
 use std::collections::HashMap;
-use signal_hook::{consts::SIGINT, iterator::Signals};
-use std::thread;
 use carrot_libs::args;
 use carrot_libs::input;
 use serde_derive::{Deserialize, Serialize};
@@ -105,15 +100,15 @@ pub fn detect_commands(commands:Vec<Vec<String>>) {
         if !stop {
             match commands[index][0].as_str() {
                 "gt" => gt(&commands[index], index, &mut returns),
-                "help" | "?" => help(),
+                // "help" | "?" => help(),
                 "exit" | "quit" | "bye" => exit(&commands[index], index, &mut returns),
                 "getenv" | "get" => getenv(&commands[index], index, &mut returns),
                 "setenv" | "set" => setenv(&commands[index], index, &mut returns),
                 "end" => stop=false,
                 "else" => command_else(&mut index, &mut returns, &commands, &mut stop),
                 "then" => then(&mut index, &mut returns, &commands, &mut stop),
-                "exec" => runcommand(&commands[index], index, &mut returns),
-                _ => runcommand(&commands[index], index, &mut returns)
+                "exec" => helpful::runcommand(&commands[index], index, &mut returns),
+                _ => helpful::runcommand(&commands[index], index, &mut returns)
             };
             if index < commands.len() {
                 index+=1;
@@ -123,54 +118,6 @@ pub fn detect_commands(commands:Vec<Vec<String>>) {
             return;
         };
     }
-}
-
-fn help() {
-    todo!("Help!");
-}
-
-// This will be used to execute commands!
-fn runcommand(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
-    // Do nothing if nothing was requested
-    // This might occur when the user presses ENTER without even typing anything
-    if args.is_empty() || args[0].is_empty() {
-        print!("");
-    }
-
-    // Create a new thread waitinh for SIGINT
-    let mut signals = Signals::new([SIGINT]).unwrap();
-    thread::spawn(move || {
-        for sig in signals.forever() {
-            if sig == 2 {
-                println!("SIGINT");
-                return;
-            } else {
-                println!("{sig}");
-
-            }
-        }
-    });
-
-    // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and get it's status
-    // using process::Command::new().args().status();
-    match process::Command::new(&args[0]).args(&args[1..]).status() { 
-        Err(e) => {
-            eprintln!("{}: Command execution failed: {:?}", args[0], e.kind());
-            report_failure(index, returns)
-        },
-        Ok(process) => {
-            // If the command is possible to run, save it's status to "returns" variable
-            let command_status = CommandStatus {
-                code: process.code(),
-                success: process.success(),
-                signal: process.signal(),
-                core_dumped: process.core_dumped()
-            };
-            returns.insert(index, command_status);
-        },
-    }
-    // Flush stdout
-    io::stdout().flush().unwrap();
 }
 
 fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>], stop:&mut bool) {

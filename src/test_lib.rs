@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use crate::helpful::*;
 use crate::end::*;
 
-// This function goes back in commands history to find closest comparison operator like "TEST"
-// If that found operator reported "success", find "END" and jump straight to that.
-// Don't do anything between "ELSE" and "END" or another "ELSE".
-// otherwise, (so if previous operator failed) try launching all commands until next "END" or "ELSE"
+// This function goes back in commands history to find closest comparison operator like "IF"
+// If that previously found operator reported "success", find "END" and jump straight to that.
+// Don't do anything inside "ELSE" and "END" or another "ELSE".
+// otherwise, (so if previous comparision operator failed) try launching all commands until another "END" or "ELSE"
 pub fn command_else(index_of_else:&mut usize, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>], stop:&mut bool) {
     if *index_of_else == 0 {
         eprintln!("SYNTAX ERROR! Operator \"ELSE\" doesn't work when there is nothing before it!");
@@ -19,7 +19,7 @@ pub fn command_else(index_of_else:&mut usize, returns: &mut HashMap<usize, Comma
         *stop=true;
     }
 
-    // Look for the nearest possible previous comparison operator
+    // Look back for the nearest possible comparison operator
     let mut index_of_nearest_cmp_operator = *index_of_else-1;
     loop {
         if CMP_OPERATORS.contains(&commands[index_of_nearest_cmp_operator][0].as_str()) {

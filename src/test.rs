@@ -1,15 +1,11 @@
 use std::collections::HashMap;
-use std::os::unix::process::ExitStatusExt;
-use std::process::{self, Stdio};
-use signal_hook::{consts::SIGINT, iterator::Signals};
-use std::thread;
+use std::process;
 use carrot_libs::args;
 // This is how to import other rush files when the current source file is defined as binary in Cargo.toml
 mod helpful;
 use crate::helpful::*;
 
 const SPLIT_COMMANDS:[&str;3] = ["and", "or", "not"];
-//const CMP_OPERATORS:[&str;1] = rush::CMP_OPERATORS;
 
 fn main() {
     let opts = args::opts();
@@ -71,36 +67,6 @@ fn main() {
         process::exit(0);        
     } else {
         process::exit(1);
-    }
-}
-
-fn silent_exec(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
-    // Create a new thread waitinh for SIGINT
-    let mut signals = Signals::new([SIGINT]).unwrap();
-    thread::spawn(move || {
-        for sig in signals.forever() {
-            if sig == 2 {
-                return;
-            }
-        }
-    });
-
-    // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and collect it's status to "returns"
-    match process::Command::new(&args[0]).args(&args[1..]).stdout(Stdio::null()).status() { 
-        Err(e) => {
-            eprintln!("{}: Command execution failed because of an error: {}", args[0], e.kind());
-            report_failure(index, returns)
-        },
-        Ok(process) => {
-            // If the command is possible to run, save it's status to "returns" variable
-            let command_status = CommandStatus {
-                code: process.code(),
-                success: process.success(),
-                signal: process.signal(),
-                core_dumped: process.core_dumped()
-            };
-            returns.insert(index, command_status);
-        },
     }
 }
 
