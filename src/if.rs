@@ -1,9 +1,25 @@
+#![allow(unused_imports)]
+/*
+Rust import system is so stupid that I can't import anything MY OWN modules in this particular project tree.
+Trying to use mod or use in any way does not help.
+
+The only solution that I found as of now is to create a directory named "IF" and then creating symbolic links to end.rs and helpful.rs.
+Then, I have to add "#![allow(clippy::duplicate_mod)]" to "rush.rs" to tell the compiler, that I want to ignore the fact, 
+that some modules are imported multiple times (like... WHAT???)
+
+It's just broken or I am sick and I can't read the docs properly to find the correct solution.
+TODO
+*/
+
 use std::collections::HashMap;
 use std::process;
 use carrot_libs::args;
-// This is how to import other rush files when the current source file is defined as binary in Cargo.toml
+
 mod helpful;
+mod end;
 use crate::helpful::*;
+// Why this import is considered to be useless?
+use crate::end::*;
 
 const SPLIT_COMMANDS:[&str;3] = ["and", "or", "not"];
 
@@ -70,9 +86,55 @@ fn main() {
     }
 }
 
+// This function goes back in commands history to find closest comparison operator like "IF"
+// If that previously found operator reported "success", find "END" and jump straight to that.
+// Don't do anything inside "ELSE" and "END" or another "ELSE".
+// otherwise, (so if previous comparision operator failed) try launching all commands until another "END" or "ELSE"
+pub fn command_else(index_of_else:&mut usize, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>], stop:&mut bool) {
+    if *index_of_else == 0 {
+        eprintln!("SYNTAX ERROR! Operator \"ELSE\" doesn't work when there is nothing before it!");
+        report_failure(*index_of_else, returns);
+        *stop=true;
+    }
+    if *index_of_else == commands.len()-1 {
+        eprintln!("SYNTAX ERROR! Operator \"ELSE\" doesn't work when there is nothing after it!");
+        report_failure(*index_of_else, returns);
+        *stop=true;
+    }
+
+    // Look back for the nearest possible comparison operator
+    let mut index_of_nearest_cmp_operator = *index_of_else-1;
+    loop {
+        if CMP_OPERATORS.contains(&commands[index_of_nearest_cmp_operator][0].as_str()) {
+            break;
+        }
+        if index_of_nearest_cmp_operator == 0 && !CMP_OPERATORS.contains(&commands[index_of_nearest_cmp_operator][0].as_str()) {
+            eprintln!("SYNTAX ERROR! Operator \"ELSE\" is NOT preceded by any comparison operator!");
+            report_failure(*index_of_else, returns);
+            *stop=true;
+            break;
+        }
+        index_of_nearest_cmp_operator -= 1;
+    }
+
+    // Check if previous cmp operator succeeded
+    let status_of_cmp_operator = if returns.contains_key(&index_of_nearest_cmp_operator) {
+        returns.get(&index_of_nearest_cmp_operator).unwrap().success
+    }
+    else {
+        eprintln!("OPERATOR \"ELSE\" FAILED! Unable to read exit code of the previous comparison operator!");
+        *stop=true;
+        false
+    };
+    // Do the test - jump to "END" or "ELSE" if needed
+    end::jump_to_end(index_of_else, 0, !status_of_cmp_operator, stop, returns, commands);
+
+
+}
+
 // This checks exit code of commands executed before and after.
 // Then, it returns true ONLY IF BOTH return codes are positive
-fn and(index_of_and:usize, returns: &mut HashMap<usize, CommandStatus>) {
+pub fn and(index_of_and:usize, returns: &mut HashMap<usize, CommandStatus>) {
     if index_of_and == 0 {
         eprintln!("SYNTAX ERROR! Operator \"AND\" doesn't work when there is nothing before it!");
         report_failure(index_of_and, returns);
@@ -109,7 +171,7 @@ fn and(index_of_and:usize, returns: &mut HashMap<usize, CommandStatus>) {
 }
 
 // This checks return code before and after it and returns true IF ANY return codes are positive
-fn or(index_of_or:usize, returns: &mut HashMap<usize, CommandStatus>) {
+pub fn or(index_of_or:usize, returns: &mut HashMap<usize, CommandStatus>) {
     if index_of_or == 0 {
         eprintln!("SYNTAX ERROR! Operator \"OR\" doesn't work when there is nothing before it!");
         process::exit(1);
@@ -132,7 +194,7 @@ fn or(index_of_or:usize, returns: &mut HashMap<usize, CommandStatus>) {
 }
 
 // This changes the return code after it
-fn not(index_of_not:usize, returns: &mut HashMap<usize, CommandStatus>) {
+pub fn not(index_of_not:usize, returns: &mut HashMap<usize, CommandStatus>) {
     if !returns.contains_key(&(index_of_not+1)) {
         eprintln!("SYNTAX ERROR! Operator \"NOT\" doesn't work when there is nothing after it!");
         process::exit(1);

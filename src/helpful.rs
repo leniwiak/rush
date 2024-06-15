@@ -22,6 +22,8 @@ use std::thread;
 pub const SPLIT_COMMANDS:[&str;4] = ["then", "next", "end", "else"];
 // Commands that can be nested. You can write IF inside of another IF.
 pub const NESTABLE_OPERATORS:[&str;2] = ["if", "loop"];
+// When ELSE checks if it can continue executing commands, it looks back for these keywords in history to check if they succeeded.
+// In an IF statement, you do not want to execute anything from multiple ELSE's
 pub const CMP_OPERATORS:[&str;2] = ["if", "else"];
 pub const END_LOGIC:[&str;2] = ["end", "else"];
 

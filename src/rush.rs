@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-
+#![allow(clippy::duplicate_mod)]
 use std::process;
 use std::env;
 use std::collections::HashMap;
@@ -7,14 +7,14 @@ use carrot_libs::args;
 use carrot_libs::input;
 use serde_derive::{Deserialize, Serialize};
 
-mod helpful;
-mod gt;
+mod end;
 mod exit;
 mod getenv;
+mod gt;
+mod helpful;
+mod r#if;
 mod setenv;
-mod test_lib;
-mod end;
-use {helpful::*, test_lib::*, getenv::*, setenv::*, end::*, gt::*, exit::*};
+use {end::*, exit::*, getenv::*, gt::*, r#if::*, helpful::*, setenv::*};
 
 #[derive(Serialize, Deserialize)]
 struct RushConfig {
