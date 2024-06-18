@@ -52,11 +52,28 @@
 
 - TEST: Renamed back again to 'IF'. Don't know why I named it 'TEST' before. Such a stupid name.
 
+# Release 0.3.2:
+
+### Added on 15.06.2024
+
+- *: Many code improvements, refactorings and cleanup.
+- *: Many (long) comments were added to make all the spaghetti less painful to read
+- IF: Fixed an issue that caused IF not to detect END keyword
+
+# Release 0.3.3:
+
+### Added on 18.06.2024
+
+- IF: Complete code overhaul, with some syntax changes
+- IF: This program is tolerated as completely independent program from the shell
+
 ### Waiting features:
 
 - MATH: Do the math stuff
 - WHILE, LOOP, MATCH, FOR: More logic operations
 - BREAK: Quit from the loop
+- IF: Add support for ELSE and ELSEIF (again)
+- HELPFUL: split_commands() separates commands not only after keywords requested in args, but also when '\n' char is found
 
 # Release 0.4.0:
 

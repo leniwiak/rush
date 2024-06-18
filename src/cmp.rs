@@ -75,7 +75,7 @@ fn main() {
     // Are we comparing numbers?
     let left_is_numeric = left.parse::<usize>().is_ok();
     let right_is_numeric = right.parse::<usize>().is_ok();
-    dbg!(left_is_numeric, right_is_numeric);
+    // dbg!(left_is_numeric, right_is_numeric);
 
     // The variable "comparison_status" will be used by process::exit to return 0 or 1
     let comparison_status:bool;
@@ -143,7 +143,7 @@ fn replace_contents(text:String) -> String {
             println!("{:?}", ewygerfeue);
         }
         
-        let output = cmd_content(&ewygerfeue);
+        let output = getoutput_exec(&ewygerfeue);
         
         if text.starts_with(':') {
             String::from_utf8(output.stdout).unwrap()

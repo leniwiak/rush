@@ -1,4 +1,3 @@
-#![allow(unused_imports)]
 /*
 Rust import system is so stupid that I can't import anything MY OWN modules in this particular project tree.
 Trying to use mod or use in any way does not help.
@@ -16,133 +15,181 @@ use std::process;
 use carrot_libs::args;
 
 mod helpful;
-mod end;
-use crate::helpful::*;
-// Why this import is considered to be useless?
-use crate::end::*;
 
-const SPLIT_COMMANDS:[&str;3] = ["and", "or", "not"];
+// This command uses it's own set of splitting words
+const SPLIT_COMMANDS:[&str;7] = ["and", "or", "not", "do", "else", "elseif", "end"];
+const JUMP_SPOTS:[&str;3] = ["elseif", "else", "end"];
+
+/*
+While working with this code, it might be usefull for you to get used to some of my own terminology.
+I don't know if names of parts of IF statements are standarized somewhere or something like that but nevermind...
+
+just know that many of the functions, variables, comments and lot's of other stuff in the code below uses some magical
+words because...
+
+The whole code below is an example of an IF statement. Everything starting with an "IF" and ending with an "END" is an IF statement.
+
+-- This is an "IF" keyword. It starts this particular type of logic.
+-- "IF", "ELSEIF" and "ELSE" are called "super operators".
+|
+|   -- Everything between "IF" and "DO" is a "comparison statement"
+|   |
+|   |        -- This is an "OR" keyword. Both "OR" and "AND" (not used in this example) keywords are called "operators".
+|   |        |
+|   |        |             -- This is a "DO" keyword. It's also called a "summarizer" because it sums up all the return codes
+|   |        |             -- from commands in a "comparison statement". If everythig went fine (returned a success) - execute a "task"
+|   |        |             -- if not (there is at least one command that returned a failure) - skip a "task" (I'll explain this in a moment)
+|   |        |             -- and jump to "jump spot" (Will explain this too).
+|   |        |             |
+if cmp 1 = 4 or cmp 1 = 1 do
+    say "Equal to one!"   -- This is a "task"
+    say "or to four!"     -- This also is a "task". Like everything between "DO" and "ELSEIF" or "ELSE"
+
+  -- As you can see, the logic is simple. If everything inside comparison statement succeeds, we do the "task",
+  -- if not, we skip the "task" and jump to the next "ELSEIF", "ELSE" or "END".
+  -- This is why those three keywords are often called a "jump spot".
+  |
+elseif cmp 1 = 2 or cmp 1 = 3 do
+    say "Equal to two or three!"  -- Another "task"
+else                              -- Another "jump spot"
+    say "I don't get it"          -- Task once again
+end                               -- And a final jump spot.
+*/
 
 fn main() {
     let opts = args::opts();
     let (swcs, vals) = args::swcs();
 
     // Refuse to run when switches have been passed
-    if ! swcs.is_empty() {
-        eprintln!("This program does not support any switches and values!");
-        process::exit(1);
-    };
-    if ! vals.is_empty() {
+    if ! swcs.is_empty() || ! vals.is_empty() {
         eprintln!("This program does not support any switches and values!");
         process::exit(1);
     };
 
     if opts.is_empty() {
-        eprintln!("The \"TEST\" statement requires at least one argument!");
+        eprintln!("The \"IF\" statement requires at least one argument!");
         process::exit(1);
     }
 
-    // Split all arguments by super commands
-    let commands = split_commands(opts.clone(), SPLIT_COMMANDS.to_vec());
-    // Collect exit statuses here
-    let mut returns: HashMap<usize, CommandStatus> = HashMap::new();
+    // IF is not defined in options but let's assume that it's index number is zero.
+    let super_operator_index = 0;
+    let comparison_statement_starting_position = super_operator_index+1;
+    
+    // If there is any "IF" in options, that means, that user probably requested IF multiple times
+    // you can't do that while working with IF's
+    if opts.contains(&"if".to_string()) {
+        eprintln!("SYNTAX ERROR! Repeated \"IF\" operator inside of an IF statement!");
+        process::exit(1);
+    }
+    // If these keywords are not present - The syntax is surelly incorrect
+    if !opts.contains(&"do".to_string()) {
+        eprintln!("SYNTAX ERROR! Missing \"DO\" operator inside of an IF statement!");
+        process::exit(1);
+    }
+    if !opts.contains(&"end".to_string()) {
+        eprintln!("SYNTAX ERROR! Missing \"END\" operator inside of an IF statement!");
+        process::exit(1);
+    }
+    
+    // Protect from writing "do end". The task cannot be empty. "END" have to be preceeded with something different than "DO"
+    // TODO
 
-    // Run all standard commands
+    // Split all arguments by splitting keywords
+    let all_commands = helpful::split_commands(opts.clone(), SPLIT_COMMANDS.to_vec());
+    // Collect exit statuses here
+    let mut returns: HashMap<usize, helpful::CommandStatus> = HashMap::new();
+
+    // Find out where "DO" and closest jump spot is located
+    let do_keyword_position = all_commands.iter().position(|x| x[0] == "do").unwrap();
+    let jump_spot_position = all_commands.iter().position(|x| JUMP_SPOTS.contains(&x[0].as_str())).unwrap();
+    // This is a list containing everything between current IF/ELSEIF/ELSE and DO
+    let comparison_statement_commands = &all_commands[comparison_statement_starting_position..do_keyword_position].to_vec();
+    // This is a list containing everything between DO and closest jump spot
+    // When separating task commands, do not use IF-specific SPLIT_COMMANDS. Use those defined in helpful instead.
+    let task_commands = helpful::split_commands(opts[do_keyword_position+1..jump_spot_position].to_vec(), helpful::SPLIT_COMMANDS.to_vec());
+
+    // Protect from writing "if do", "elseif do" and "else do". "DO" have to be preceeded with something different than just a
+    // super operator "if"
+    prevent_empty_comparison_statement(0, comparison_statement_commands);
+
+    // Run all commands inside comparison statement
     let mut index = 0;
-    while index < commands.len() {
-        // Execute all standard commands and collect their statuses
-        if !SPLIT_COMMANDS.contains(&commands[index][0].as_str()) {
-            silent_exec(&commands[index], index, &mut returns);
+    while index < comparison_statement_commands.len() {
+        // Execute all commands and collect their statuses to "returns"
+        if !SPLIT_COMMANDS.contains(&comparison_statement_commands[index][0].as_str()) {
+            helpful::silent_exec(&comparison_statement_commands[index], index, &mut returns);
         }
         index+=1;
     }
 
-    // When exit codes of standard commands are known - try executing AND, OR operators
+    // When exit codes of all commands inside comparison statement are known - try executing AND, OR operators
     let mut index = 0;
-    while index < commands.len() {
-        // Execute all standard commands and collect their statuses
-        match commands[index][0].as_str() {
+    while comparison_statement_commands[index][0] != "do" {
+        match comparison_statement_commands[index][0].as_str() {
             "and" => and(index, &mut returns),
             "or" => or(index, &mut returns),
             "not" => not(index, &mut returns),
+            "else" | "elseif" | "end" | "if" => {
+                eprintln!("SYNTAX ERROR! Operator \"{}\" was found in comparison statement!", comparison_statement_commands[index][0]);
+                process::exit(1);
+            },
             _ => (),
         }
         index+=1;
     }
 
-    // Check if every command between "IF" and "DO" returned success
-    let mut ok = true;
-    for (i,_r) in returns.iter().enumerate() {
-        // If there is at least one unsuccessfull command - quit
-        if !returns.get(&i).unwrap().success {
-            ok = false;
-            break;
-        }
-    };
-    if ok {
-        process::exit(0);        
+    // Check if every command after "IF" returned success.
+    if check_statuses(&returns, comparison_statement_starting_position, do_keyword_position) {
+        do_the_task(task_commands);
+        // We don't want to run any other ELSEIF or ELSE after current task is done.
+        process::exit(0);
     } else {
         process::exit(1);
     }
 }
 
-// This function goes back in commands history to find closest comparison operator like "IF"
-// If that previously found operator reported "success", find "END" and jump straight to that.
-// Don't do anything inside "ELSE" and "END" or another "ELSE".
-// otherwise, (so if previous comparision operator failed) try launching all commands until another "END" or "ELSE"
-pub fn command_else(index_of_else:&mut usize, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>], stop:&mut bool) {
-    if *index_of_else == 0 {
-        eprintln!("SYNTAX ERROR! Operator \"ELSE\" doesn't work when there is nothing before it!");
-        report_failure(*index_of_else, returns);
-        *stop=true;
-    }
-    if *index_of_else == commands.len()-1 {
-        eprintln!("SYNTAX ERROR! Operator \"ELSE\" doesn't work when there is nothing after it!");
-        report_failure(*index_of_else, returns);
-        *stop=true;
-    }
-
-    // Look back for the nearest possible comparison operator
-    let mut index_of_nearest_cmp_operator = *index_of_else-1;
-    loop {
-        if CMP_OPERATORS.contains(&commands[index_of_nearest_cmp_operator][0].as_str()) {
-            break;
+// BEWARE! Function check_statuses() has to check them only for commands inside the comparison operator that is currently running!
+// This is why this function scans through "returns" only for values fitting in range from "comparison_statement_starting_position"
+// to "do_keyword_position".
+fn check_statuses(returns:&HashMap<usize, helpful::CommandStatus>, start:usize, end:usize) -> bool {
+    let mut ok = true;
+    for (i,_r) in returns.iter().enumerate() {
+        if i >= start && i <= end {
+            // If there is at least one unsuccessfull command - quit
+            if !returns.get(&i).unwrap().success {
+                ok = false;
+                break;
+            }
         }
-        if index_of_nearest_cmp_operator == 0 && !CMP_OPERATORS.contains(&commands[index_of_nearest_cmp_operator][0].as_str()) {
-            eprintln!("SYNTAX ERROR! Operator \"ELSE\" is NOT preceded by any comparison operator!");
-            report_failure(*index_of_else, returns);
-            *stop=true;
-            break;
-        }
-        index_of_nearest_cmp_operator -= 1;
-    }
-
-    // Check if previous cmp operator succeeded
-    let status_of_cmp_operator = if returns.contains_key(&index_of_nearest_cmp_operator) {
-        returns.get(&index_of_nearest_cmp_operator).unwrap().success
-    }
-    else {
-        eprintln!("OPERATOR \"ELSE\" FAILED! Unable to read exit code of the previous comparison operator!");
-        *stop=true;
-        false
     };
-    // Do the test - jump to "END" or "ELSE" if needed
-    end::jump_to_end(index_of_else, 0, !status_of_cmp_operator, stop, returns, commands);
+    ok
+}
 
+// Make sure, that there is something interesting after if/elseif/else
+fn prevent_empty_comparison_statement(super_operator_index:usize, commands:&[Vec<String>]) {
+    if commands[super_operator_index+1][0] == "do" {
+        eprintln!("SYNTAX ERROR! Comparison statement is empty!");
+        process::exit(1);
+    }
+}
 
+fn do_the_task(commands: Vec<Vec<String>>) {
+    for c in commands {
+        helpful::exec(&c, 0, &mut HashMap::new());
+    }
 }
 
 // This checks exit code of commands executed before and after.
 // Then, it returns true ONLY IF BOTH return codes are positive
-pub fn and(index_of_and:usize, returns: &mut HashMap<usize, CommandStatus>) {
+pub fn and(index_of_and:usize, returns: &mut HashMap<usize, helpful::CommandStatus>) {
     if index_of_and == 0 {
         eprintln!("SYNTAX ERROR! Operator \"AND\" doesn't work when there is nothing before it!");
-        report_failure(index_of_and, returns);
+        helpful::report_failure(index_of_and, returns);
         process::exit(1);
     }
     if !returns.contains_key(&(index_of_and+1)) {
         eprintln!("SYNTAX ERROR! Operator \"AND\" doesn't work when there is nothing after it!");
-        report_failure(index_of_and, returns);
+        helpful::report_failure(index_of_and, returns);
         process::exit(1);
     }
     // Compare exit status of previous and following commands
@@ -164,14 +211,14 @@ pub fn and(index_of_and:usize, returns: &mut HashMap<usize, CommandStatus>) {
     };
 
     if prev_status && next_status {
-        report_success(index_of_and, returns);
+        helpful::report_success(index_of_and, returns);
     } else {
-        report_failure(index_of_and, returns);
+        helpful::report_failure(index_of_and, returns);
     }
 }
 
 // This checks return code before and after it and returns true IF ANY return codes are positive
-pub fn or(index_of_or:usize, returns: &mut HashMap<usize, CommandStatus>) {
+pub fn or(index_of_or:usize, returns: &mut HashMap<usize, helpful::CommandStatus>) {
     if index_of_or == 0 {
         eprintln!("SYNTAX ERROR! Operator \"OR\" doesn't work when there is nothing before it!");
         process::exit(1);
@@ -184,30 +231,30 @@ pub fn or(index_of_or:usize, returns: &mut HashMap<usize, CommandStatus>) {
     let prev = index_of_or-1;
     let next = index_of_or+1;
     if returns.get(&prev).unwrap().success || returns.get(&next).unwrap().success {
-        report_success(index_of_or, returns);
+        helpful::report_success(index_of_or, returns);
         // Overwrite the status of both exit codes to fool the if (or any other) logic that every command is ok
-        report_success(prev, returns);
-        report_success(next, returns);
+        helpful::report_success(prev, returns);
+        helpful::report_success(next, returns);
     } else {
-        report_failure(index_of_or, returns);
+        helpful::report_failure(index_of_or, returns);
     }
 }
 
 // This changes the return code after it
-pub fn not(index_of_not:usize, returns: &mut HashMap<usize, CommandStatus>) {
+pub fn not(index_of_not:usize, returns: &mut HashMap<usize, helpful::CommandStatus>) {
     if !returns.contains_key(&(index_of_not+1)) {
         eprintln!("SYNTAX ERROR! Operator \"NOT\" doesn't work when there is nothing after it!");
         process::exit(1);
     }
     // Return code of "NOT" doesn't matter
-    report_success(index_of_not, returns);
+    helpful::report_success(index_of_not, returns);
 
     // Get exit code of the next command
     let next = index_of_not+1;
     if returns.get(&next).unwrap().success {
         // Overwrite the status of the next exit code
-        report_failure(next, returns);
+        helpful::report_failure(next, returns);
     } else {
-        report_success(next, returns);
+        helpful::report_success(next, returns);
     }
 }

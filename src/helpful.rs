@@ -19,13 +19,7 @@ use std::thread;
 }
 
 // Commands that separate inline commands
-pub const SPLIT_COMMANDS:[&str;4] = ["then", "next", "end", "else"];
-// Commands that can be nested. You can write IF inside of another IF.
-pub const NESTABLE_OPERATORS:[&str;2] = ["if", "loop"];
-// When ELSE checks if it can continue executing commands, it looks back for these keywords in history to check if they succeeded.
-// In an IF statement, you do not want to execute anything from multiple ELSE's
-pub const CMP_OPERATORS:[&str;2] = ["if", "else"];
-pub const END_LOGIC:[&str;2] = ["end", "else"];
+pub const SPLIT_COMMANDS:[&str;3] = ["then", "next", "end"];
 
 // These functions will be used to report success or failure when built-in or super commands are running
 // This is usefull because typically we don't want the shell to abnormally quit when syntax of "if" statement is incorrect
@@ -96,9 +90,9 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
                     }
                     // Add all collected words in quotes, stored in 'joined' to 'words' 
                     words.insert(index, joined);
-                    println!("Current index is: {}", index);
-                    println!("Words lenght is: {}", words.len());
-                    dbg!(index+1==words.len());
+                    // println!("Current index is: {}", index);
+                    // println!("Words lenght is: {}", words.len());
+                    // dbg!(index+1==words.len());
                     // No more words? 
                     if index+1 == words.len() {
                         // Add collected words to 'commands'.
@@ -113,7 +107,7 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
         } else {
             // If built-in keyword appears
             if spliting_keywords.contains(&words[index].as_str()) {
-                println!("Index {index}: Word {} looks like a built-in keyword.", words[index]);
+                //println!("Index {index}: Word {} looks like a keyword to split.", words[index]);
                 // Separate CURRENT keyword from PREVIOUSLY collected words
                 // Expected output: ('af' 'file'), ('then' 'ad' 'dir')
                 let (before_keyword, right) = words.split_at(index);
@@ -144,7 +138,7 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
             }
             // If there are no built-in commands
             else if !spliting_keywords.contains(&words[index].as_str()) {
-                println!("Index {index}: Word {} looks like a normal word.", words[index]);
+                //println!("Index {index}: Word {} looks like a normal word.", words[index]);
                 // Just add the words to the 'command' variable
                 command.push(words[index].clone());
                 index+=1;
@@ -156,10 +150,6 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
             };
         };
     }
-
-    println!("DEBUG COMMANDS:");
-    dbg!(&commands);
-
     commands
 }
 
@@ -182,7 +172,7 @@ pub fn strip_quotes(input:&str) -> String {
 }
 
 // This will be used to execute commands!
-pub fn runcommand(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+pub fn exec(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
     // Do nothing if nothing was requested
     // This might occur when the user presses ENTER without even typing anything
     if args.is_empty() || args[0].is_empty() {
@@ -194,7 +184,7 @@ pub fn runcommand(args:&[String], index:usize, returns:&mut HashMap<usize, Comma
     thread::spawn(move || {
         for sig in signals.forever() {
             if sig == 2 {
-                println!("SIGINT");
+                println!("Got interrupt signal!");
                 return;
             } else {
                 println!("{sig}");
@@ -226,7 +216,7 @@ pub fn runcommand(args:&[String], index:usize, returns:&mut HashMap<usize, Comma
 }
 
 // This will be used to execute commands and get it's contents!
-pub fn cmd_content(args:&[String]) -> process::Output {
+pub fn getoutput_exec(args:&[String]) -> process::Output {
     // Do nothing if nothing was requested
     // This might occur when the user presses ENTER without even typing anything
     if args.is_empty() || args[0].is_empty() {

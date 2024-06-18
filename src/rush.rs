@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-#![allow(clippy::duplicate_mod)]
 use std::process;
 use std::env;
 use std::collections::HashMap;
@@ -7,14 +5,12 @@ use carrot_libs::args;
 use carrot_libs::input;
 use serde_derive::{Deserialize, Serialize};
 
-mod end;
 mod exit;
 mod getenv;
 mod gt;
 mod helpful;
-mod r#if;
 mod setenv;
-use {end::*, exit::*, getenv::*, gt::*, r#if::*, helpful::*, setenv::*};
+use {exit::*, getenv::*, gt::*, helpful::*, setenv::*};
 
 #[derive(Serialize, Deserialize)]
 struct RushConfig {
@@ -104,11 +100,11 @@ pub fn detect_commands(commands:Vec<Vec<String>>) {
                 "exit" | "quit" | "bye" => exit(&commands[index], index, &mut returns),
                 "getenv" | "get" => getenv(&commands[index], index, &mut returns),
                 "setenv" | "set" => setenv(&commands[index], index, &mut returns),
-                "end" => stop=false,
-                "else" => command_else(&mut index, &mut returns, &commands, &mut stop),
                 "then" => then(&mut index, &mut returns, &commands, &mut stop),
-                "exec" => helpful::runcommand(&commands[index], index, &mut returns),
-                _ => helpful::runcommand(&commands[index], index, &mut returns)
+                "exec" => helpful::exec(&commands[index], index, &mut returns),
+                "panic" => panic!("Manually invoked panic message"),
+                
+                _ => helpful::exec(&commands[index], index, &mut returns)
             };
             if index < commands.len() {
                 index+=1;
@@ -135,7 +131,7 @@ fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, c
     }
     // Compare exit status of previous and following commands
     let prev_index = *index_of_then-1;
-    let prev_status = if returns.contains_key(&prev_index) {
+    if returns.contains_key(&prev_index) {
         returns.get(&prev_index).unwrap().success
     }
     else {
@@ -145,5 +141,14 @@ fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, c
     };
 
     // Go to the 'end' keyword
-    jump_to_end(index_of_then, 1, prev_status, stop, returns, commands);
+    let aaaaaaaaaa = match commands.iter().position(|x| x[0] == "end") {
+        None => {
+            eprintln!("OPERATOR \"THEN\" FAILED! Unable to find \"END\" keyword!");
+            *stop=true;
+            return;
+        },
+        Some(a) => { a },
+    };
+
+    *index_of_then=aaaaaaaaaa;
 }
