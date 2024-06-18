@@ -98,6 +98,7 @@ pub fn detect_commands(commands:Vec<Vec<String>>) {
                 "gt" => gt(&commands[index], index, &mut returns),
                 // "help" | "?" => help(),
                 "exit" | "quit" | "bye" => exit(&commands[index], index, &mut returns),
+                "end" => (),
                 "getenv" | "get" => getenv(&commands[index], index, &mut returns),
                 "setenv" | "set" => setenv(&commands[index], index, &mut returns),
                 "then" => then(&mut index, &mut returns, &commands, &mut stop),

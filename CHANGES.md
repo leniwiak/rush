@@ -67,13 +67,13 @@
 - IF: Complete code overhaul, with some syntax changes
 - IF: This program is tolerated as completely independent program from the shell
 - HELPFUL: split_commands() separates commands not only after keywords requested in args, but also when '\n' char is found
+- IF: Add support for ELSE and ELSEIF (again)
 
 ### Waiting features:
 
 - MATH: Do the math stuff
 - WHILE, LOOP, MATCH, FOR: More logic operations
 - BREAK: Quit from the loop
-- IF: Add support for ELSE and ELSEIF (again)
 
 # Release 0.4.0:
 
