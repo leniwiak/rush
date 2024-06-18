@@ -64,6 +64,22 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
         i += 1;
     };
    
+    // Split commands in place of any new-line character
+    let mut index = 0;
+    while index < words.len() {
+        if words[index].contains('\n') {
+            let dont_die = words[index].clone();
+            let word_splitted_by_newlines = dont_die.split_terminator('\n');
+            // Remove old word from "words"
+            words.remove(index);
+            // Add new collection of words in place of older one
+            for w in word_splitted_by_newlines {
+                words.insert(index, w.to_string());
+            }
+        }
+        index += 1;
+    }
+
     // Split commands in place of any built-in command
     let mut index = 0;
     while index < words.len() {
@@ -108,6 +124,7 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
             // If built-in keyword appears
             if spliting_keywords.contains(&words[index].as_str()) {
                 //println!("Index {index}: Word {} looks like a keyword to split.", words[index]);
+
                 // Separate CURRENT keyword from PREVIOUSLY collected words
                 // Expected output: ('af' 'file'), ('then' 'ad' 'dir')
                 let (before_keyword, right) = words.split_at(index);
