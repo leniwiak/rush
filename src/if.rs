@@ -84,6 +84,7 @@ fn main() {
         process::exit(1);
     }
     if !opts.contains(&"end".to_string()) {
+        dbg!(&opts);
         eprintln!("SYNTAX ERROR! Missing \"END\" operator inside of an IF statement!");
         process::exit(1);
     }
@@ -92,7 +93,7 @@ fn main() {
     // TODO
 
     // Split all arguments by splitting keywords
-    let all_commands = helpful::split_commands(args.clone(), SPLIT_COMMANDS.to_vec());
+    let all_commands = helpful::split_commands(args.clone(), SPLIT_COMMANDS.to_vec(), false);
     // Collect exit statuses here
     let mut returns: HashMap<usize, helpful::CommandStatus> = HashMap::new();
 
@@ -104,8 +105,8 @@ fn main() {
     while idx != end_position {
         // println!("LET'S GO: {idx}!!!");
         match all_commands[idx][0].as_str() {
-            "if" | "elseif" => magic(&mut idx, &opts, &all_commands, &mut returns, false),
-            "else" => magic(&mut idx, &opts, &all_commands, &mut returns, true),
+            "if" | "elseif" => magic(&mut idx, &all_commands, &mut returns, false),
+            "else" => magic(&mut idx, &all_commands, &mut returns, true),
             a => {
                 panic!("Internal error! Logic jumped to unknown super operator: {a}!");
             }
@@ -124,7 +125,7 @@ all_commands - List of commands splitted by IF-specific SPLIT_COMMANDS constant.
 returns - List of all return statuses from commands
 run_as_else - Indicate that we're running as "else" command
 */
-fn magic(idx:&mut usize, args: &Vec<String>, all_commands:&Vec<Vec<String>>, returns:&mut HashMap<usize, helpful::CommandStatus>, run_as_else:bool) {
+fn magic(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize, helpful::CommandStatus>, run_as_else:bool) {
     // IF is not defined in options but let's assume that it's index number is zero.
     let super_operator_index = *idx;
 
@@ -151,7 +152,7 @@ fn magic(idx:&mut usize, args: &Vec<String>, all_commands:&Vec<Vec<String>>, ret
         let comparison_statement_commands = &all_commands[comparison_statement_starting_position..do_keyword_position].to_vec();
         // This is a list containing commands between DO and closest jump spot
         // NOTE: When separating task commands, do not use IF-specific SPLIT_COMMANDS. Use those defined in helpful instead.
-        let task_commands = helpful::split_commands(all_commands[do_keyword_position+1].to_owned(), helpful::SPLIT_COMMANDS.to_vec());
+        let task_commands = helpful::split_commands(all_commands[do_keyword_position+1].to_owned(), helpful::SPLIT_COMMANDS.to_vec(), false);
         // dbg!(&all_commands[do_keyword_position+1]);
 
         // Run all commands inside comparison statement
@@ -191,7 +192,7 @@ fn magic(idx:&mut usize, args: &Vec<String>, all_commands:&Vec<Vec<String>>, ret
     else {
         (
             true,
-            helpful::split_commands(all_commands[super_operator_index+1].to_vec(), helpful::SPLIT_COMMANDS.to_vec())
+            helpful::split_commands(all_commands[super_operator_index+1].to_vec(), helpful::SPLIT_COMMANDS.to_vec(), false)
         )
     };
 

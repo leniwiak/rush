@@ -70,7 +70,7 @@ fn init_input_mode() {
             }
         };
         // Separate commands from super commands
-        let commands = split_commands(console_input, SPLIT_COMMANDS.to_vec());
+        let commands = split_commands(console_input, SPLIT_COMMANDS.to_vec(), true);
         // Execute those commands
         detect_commands(commands);
     };
@@ -98,7 +98,7 @@ pub fn detect_commands(commands:Vec<Vec<String>>) {
                 "gt" => gt(&commands[index], index, &mut returns),
                 // "help" | "?" => help(),
                 "exit" | "quit" | "bye" => exit(&commands[index], index, &mut returns),
-                "end" => (),
+                "end" | "next" => (),
                 "getenv" | "get" => getenv(&commands[index], index, &mut returns),
                 "setenv" | "set" => setenv(&commands[index], index, &mut returns),
                 "then" => then(&mut index, &mut returns, &commands, &mut stop),

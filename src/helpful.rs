@@ -18,8 +18,10 @@ use std::thread;
     pub core_dumped: bool 
 }
 
-// Commands that separate inline commands
+// Commands that separate inline commands.
 pub const SPLIT_COMMANDS:[&str;2] = ["then", "next"];
+// Commands wont be separated by shell by SPLIT_COMMANDS from point where logic operator is found, until "END" is reached.
+pub const LOGIC_OPERATORS:[&str;1] = ["if"];
 
 // These functions will be used to report success or failure when built-in or super commands are running
 // This is usefull because typically we don't want the shell to abnormally quit when syntax of "if" statement is incorrect
@@ -34,7 +36,7 @@ pub fn report_failure(index:usize, returns:&mut HashMap<usize, CommandStatus>) {
     returns.insert(index, command_status);
 }
 
-pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec<Vec<String>> {
+pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_when_inside_logic_op:bool) -> Vec<Vec<String>> {
     // This list contains all commands passed by the user 
     let mut commands: Vec<Vec<String>> = Vec::new();
     // List of words in one command
@@ -90,10 +92,21 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
         index += 1;
     }
 
-    // Split commands in place of any built-in command
     let mut index = 0;
+    /*
+    The shell was designed to NOT split commands if we're inside of some logic. (In IF statement, for example)
+    if cmp 11 = 11 do
+        say "hello"
+        say "it is equal to eleven" next say "so lucky."
+    end
+
+    In the code above, function split_commands() wouldn't split commands by newline character nor by the "next" keyword.
+    The IF statement should do this manually.
+    */
+    let mut logic_operators_depth = 0;
+    let logic_operators = LOGIC_OPERATORS.to_vec();
     while index < words.len() {
-        // Word starts with a quote
+        // Words starting with a quote have to be tolerated as one, large command
         if words[index].starts_with('\'') || words[index].starts_with('"') {
             // Build one large argument from words in quotes
             let mut joined = String::new();
@@ -130,10 +143,21 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
                 words.remove(index);
             }
             index+=1;
-        } else {
-            // If built-in keyword appears
-            if spliting_keywords.contains(&words[index].as_str()) || spliting_keywords.contains(&"newline") {
-                //println!("Index {index}: Word {} looks like a keyword to split.", words[index]);
+        }
+        // Split commands in place of any built-in command
+        else {
+            if logic_operators.contains(&words[index].as_str()) && split_when_inside_logic_op {
+                logic_operators_depth += 1;
+            } else if words[index] == "end" && logic_operators_depth != 0 && split_when_inside_logic_op {
+                logic_operators_depth -= 1;
+            }
+
+            let inside_logic_operator = logic_operators_depth != 0;
+
+            // If built-in or newline keyword appears AND if we're not in logical operation
+            if (spliting_keywords.contains(&words[index].as_str()) || spliting_keywords.contains(&"newline")) && !inside_logic_operator {
+                // println!("Index {index}: Word {} looks like a keyword to split.", words[index]);
+                // println!("Is keyword {} in a logic? {}", words[index], inside_logic_operator);
 
                 // Separate CURRENT keyword from PREVIOUSLY collected words
                 // Expected output: ('af' 'file'), ('then' 'ad' 'dir')
@@ -163,9 +187,9 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>) -> Vec
                 // Example: ('ad' 'dir')
                 index = 0;
             }
-            // If there are no built-in commands
-            else if !spliting_keywords.contains(&words[index].as_str()) {
-                //println!("Index {index}: Word {} looks like a normal word.", words[index]);
+            // If there are no built-in commands nor "newline" keyword or if we're in logical operator
+            else if (!spliting_keywords.contains(&words[index].as_str()) && !spliting_keywords.contains(&"newline")) || inside_logic_operator {
+                // println!("Index {index}: Word {} looks like a normal word.", words[index]);
                 // Just add the words to the 'command' variable
                 command.push(words[index].clone());
                 index+=1;
