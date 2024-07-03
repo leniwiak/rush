@@ -1,6 +1,6 @@
 [package]
 name = "rush"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 
 [build]
@@ -35,13 +35,17 @@ name = "cmp"
 path = "src/cmp.rs"
 
 [[bin]]
+name = "if"
+path = "src/if.rs"
+
+[[bin]]
+name = "loop"
+path = "src/loop.rs"
+
+[[bin]]
 name = "rush"
 path = "src/rush.rs"
 
 [[bin]]
 name = "sleep"
 path = "src/sleep.rs"
-
-[[bin]]
-name = "if"
-path = "src/if.rs"

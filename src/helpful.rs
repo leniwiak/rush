@@ -7,8 +7,6 @@ use std::process::Stdio;
 use std::io;
 use std::io::Write;
 use std::os::unix::process::ExitStatusExt;
-use signal_hook::{consts::SIGINT, iterator::Signals};
-use std::thread;
 
 #[derive(Debug)]
  pub struct CommandStatus {
@@ -21,7 +19,7 @@ use std::thread;
 // Commands that separate inline commands.
 pub const SPLIT_COMMANDS:[&str;2] = ["then", "next"];
 // Commands wont be separated by shell by SPLIT_COMMANDS from point where logic operator is found, until "END" is reached.
-pub const LOGIC_OPERATORS:[&str;1] = ["if"];
+pub const LOGIC_OPERATORS:[&str;2] = ["if", "loop"];
 
 // These functions will be used to report success or failure when built-in or super commands are running
 // This is usefull because typically we don't want the shell to abnormally quit when syntax of "if" statement is incorrect
@@ -230,20 +228,6 @@ pub fn exec(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStat
         print!("");
     }
 
-    // Create a new thread waitinh for SIGINT
-    let mut signals = Signals::new([SIGINT]).unwrap();
-    thread::spawn(move || {
-        for sig in signals.forever() {
-            if sig == 2 {
-                println!("Got interrupt signal!");
-                return;
-            } else {
-                println!("{sig}");
-
-            }
-        }
-    });
-
     // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and get it's status
     // using process::Command::new().args().status();
     match process::Command::new(&args[0]).args(&args[1..]).status() { 
@@ -273,16 +257,6 @@ pub fn getoutput_exec(args:&[String]) -> process::Output {
     if args.is_empty() || args[0].is_empty() {
         print!("");
     }
-
-    // Create a new thread waitinh for SIGINT
-    let mut signals = Signals::new([SIGINT]).unwrap();
-    thread::spawn(move || {
-        for sig in signals.forever() {
-            if sig == 2 {
-                return;
-            }
-        }
-    });
     
     // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and get it's status
     // using process::Command::new().args().status();
@@ -299,16 +273,6 @@ pub fn getoutput_exec(args:&[String]) -> process::Output {
 }
 
 pub fn silent_exec(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
-    // Create a new thread waitinh for SIGINT
-    let mut signals = Signals::new([SIGINT]).unwrap();
-    thread::spawn(move || {
-        for sig in signals.forever() {
-            if sig == 2 {
-                return;
-            }
-        }
-    });
-
     // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and collect it's status to "returns"
     match process::Command::new(&args[0]).args(&args[1..]).stdout(Stdio::null()).status() { 
         Err(e) => {

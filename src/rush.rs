@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use carrot_libs::args;
 use carrot_libs::input;
 use serde_derive::{Deserialize, Serialize};
+use signal_hook::{consts::SIGINT, iterator::Signals};
+use std::thread;
 
 mod exit;
 mod getenv;
@@ -35,6 +37,21 @@ fn main() {
         eprintln!("This program does not support any switches and values!");
         process::exit(1);
     };
+
+    // Create a new thread waiting for SIGINT
+    // to prevent quiting with CTRL-C
+    let mut signals = Signals::new([SIGINT]).unwrap();
+    thread::spawn(move || {
+        for sig in signals.forever() {
+            if sig == 2 {
+                println!("Got interrupt signal!");
+                return;
+            } else {
+                println!("{sig}");
+
+            }
+        }
+    });
 
     /*
     This shell will work in two modes:

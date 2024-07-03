@@ -73,7 +73,7 @@ fn main() {
     }
     
     // If there is any "IF" in options, that means, that user probably requested IF multiple times
-    // you can't do that while working with IF's
+    // you can't do that while working with IFs
     if opts.contains(&"if".to_string()) {
         eprintln!("SYNTAX ERROR! Repeated \"IF\" operator inside of an IF statement!");
         process::exit(1);

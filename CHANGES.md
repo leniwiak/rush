@@ -69,11 +69,16 @@
 - HELPFUL: split_commands() separates commands not only after keywords requested in args, but also when '\n' char is found
 - IF: Add support for ELSE and ELSEIF (again)
 
+# Release 0.3.4:
+
+### Added on 3.07.2024
+
+- LOOP: Add this very simple loop
+
 ### Waiting features:
 
 - MATH: Do the math stuff
 - WHILE, LOOP, MATCH, FOR: More logic operations
-- BREAK: Quit from the loop
 
 # Release 0.4.0:
 
