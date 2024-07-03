@@ -79,18 +79,21 @@ fn main() {
         process::exit(1);
     }
     // If these keywords are not present - The syntax is surelly incorrect
-    if !opts.contains(&"do".to_string()) {
+    if ! opts.contains(&"do".to_string()) {
         eprintln!("SYNTAX ERROR! Missing \"DO\" operator inside of an IF statement!");
         process::exit(1);
     }
-    if !opts.contains(&"end".to_string()) {
+    if ! opts.contains(&"end".to_string()) {
         dbg!(&opts);
         eprintln!("SYNTAX ERROR! Missing \"END\" operator inside of an IF statement!");
         process::exit(1);
     }
     
-    // Protect from writing "do end". The task cannot be empty. "END" have to be preceeded with something different than "DO"
-    // TODO
+    // Protect from writing "if do". The comparison statement cannot be empty.
+    if opts[0] == "do" {
+        eprintln!("SYNTAX ERROR! There is nothing between keywords \"IF\" and \"DO\"!");
+        process::exit(1);
+    }
 
     // Split all arguments by splitting keywords
     let all_commands = helpful::split_commands(args.clone(), SPLIT_COMMANDS.to_vec(), false);
@@ -99,6 +102,13 @@ fn main() {
 
     
     let mut idx = 0;
+    // Protect from writing "do end". The task cannot be empty.
+    let do_position = all_commands.iter().position(|x| x[0] == "do" ).unwrap();
+    if all_commands[do_position+1][0] == "end" {
+        eprintln!("SYNTAX ERROR! There is nothing between keywords \"DO\" and \"END\"!");
+        process::exit(1);
+    }
+
     let end_position = all_commands.iter().position(|x| x[0] == "end" ).unwrap();
 
     // dbg!(&all_commands);
