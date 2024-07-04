@@ -100,7 +100,7 @@ fn main() {
         Ok(e) => e,
     };
     // Collect exit statuses here
-    let mut returns: HashMap<usize, helpful::CommandStatus> = HashMap::new();
+    let mut returns: HashMap<usize, bool> = HashMap::new();
     
     let mut idx = 0;
     // Protect from writing "do end". The task cannot be empty.
@@ -134,7 +134,7 @@ all_commands - List of commands splitted by IF-specific SPLIT_COMMANDS constant.
 returns - List of all return statuses from commands
 run_as_else - Indicate that we're running as "else" command
 */
-fn magic(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize, helpful::CommandStatus>, run_as_else:bool) {
+fn magic(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize, bool>, run_as_else:bool) {
     // This is where current super operator (IF/ELSEIF/ELSE) is located in options
     // TIP: IF is not defined in options but let's assume that it's index number is zero if we're starting IF logic.
     let super_operator_index = *idx;
@@ -233,15 +233,15 @@ fn magic(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize
 // BEWARE! Function check_statuses() has to check them only for commands inside the comparison operator that is currently running!
 // This is why this function scans through "returns" only for values fitting in range from "comparison_statement_starting_position"
 // to "do_keyword_position".
-fn check_statuses(returns:&HashMap<usize, helpful::CommandStatus>, start:usize, end:usize) -> bool {
+fn check_statuses(returns:&HashMap<usize, bool>, start:usize, end:usize) -> bool {
     let mut ok = true;
 
     // dbg!(returns);
     let mut index = start;
     while index < end {
-        // dbg!(returns.get(&index).unwrap().success);
+        // dbg!(returns.get(&index).unwrap());
         // If there is at least one unsuccessfull command - quit
-        if !returns.get(&index).unwrap().success {
+        if !returns.get(&index).unwrap() {
             ok = false;
             break;
         }
@@ -257,7 +257,7 @@ pub fn do_the_task(commands: Vec<Vec<String>>) {
 
 // This checks exit code of commands executed before and after.
 // Then, it returns true ONLY IF BOTH return codes are positive
-pub fn and(index_of_and:usize, returns: &mut HashMap<usize, helpful::CommandStatus>) {
+pub fn and(index_of_and:usize, returns: &mut HashMap<usize, bool>) {
     if index_of_and == 0 {
         eprintln!("SYNTAX ERROR! Operator \"AND\" doesn't work when there is nothing before it!");
         helpful::report_failure(index_of_and, returns);
@@ -272,21 +272,21 @@ pub fn and(index_of_and:usize, returns: &mut HashMap<usize, helpful::CommandStat
     let prev_index = index_of_and-1;
     let next_index = index_of_and+1;
     let prev_status = if returns.contains_key(&prev_index) {
-        returns.get(&prev_index).unwrap().success
+        returns.get(&prev_index).unwrap()
     }
     else {
         eprintln!("OPERATOR \"AND\" FAILED! Unable to read exit code of the previous command!");
         process::exit(1);
     };
     let next_status = if returns.contains_key(&next_index) {
-        returns.get(&next_index).unwrap().success
+        returns.get(&next_index).unwrap()
     }
     else {
         eprintln!("OPERATOR \"AND\" FAILED! Unable to read exit code of the next command!");
         process::exit(1);
     };
 
-    if prev_status && next_status {
+    if *prev_status && *next_status {
         helpful::report_success(index_of_and, returns);
     } else {
         helpful::report_failure(index_of_and, returns);
@@ -294,7 +294,7 @@ pub fn and(index_of_and:usize, returns: &mut HashMap<usize, helpful::CommandStat
 }
 
 // This checks return code before and after it and returns true IF ANY return codes are positive
-pub fn or(index_of_or:usize, returns: &mut HashMap<usize, helpful::CommandStatus>) {
+pub fn or(index_of_or:usize, returns: &mut HashMap<usize, bool>) {
     if index_of_or == 0 {
         eprintln!("SYNTAX ERROR! Operator \"OR\" doesn't work when there is nothing before it!");
         process::exit(1);
@@ -306,7 +306,7 @@ pub fn or(index_of_or:usize, returns: &mut HashMap<usize, helpful::CommandStatus
     // Compare previous and following commands
     let prev = index_of_or-1;
     let next = index_of_or+1;
-    if returns.get(&prev).unwrap().success || returns.get(&next).unwrap().success {
+    if *returns.get(&prev).unwrap() || *returns.get(&next).unwrap() {
         helpful::report_success(index_of_or, returns);
         // Overwrite the status of both exit codes to fool the if (or any other) logic that every command is ok
         helpful::report_success(prev, returns);
@@ -317,7 +317,7 @@ pub fn or(index_of_or:usize, returns: &mut HashMap<usize, helpful::CommandStatus
 }
 
 // This changes the return code after it
-pub fn not(index_of_not:usize, returns: &mut HashMap<usize, helpful::CommandStatus>) {
+pub fn not(index_of_not:usize, returns: &mut HashMap<usize, bool>) {
     if !returns.contains_key(&(index_of_not+1)) {
         eprintln!("SYNTAX ERROR! Operator \"NOT\" doesn't work when there is nothing after it!");
         process::exit(1);
@@ -327,7 +327,7 @@ pub fn not(index_of_not:usize, returns: &mut HashMap<usize, helpful::CommandStat
 
     // Get exit code of the next command
     let next = index_of_not+1;
-    if returns.get(&next).unwrap().success {
+    if *returns.get(&next).unwrap() {
         // Overwrite the status of the next exit code
         helpful::report_failure(next, returns);
     } else {

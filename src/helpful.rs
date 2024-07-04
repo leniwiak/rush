@@ -8,14 +8,6 @@ use std::io;
 use std::io::Write;
 use std::os::unix::process::ExitStatusExt;
 
-#[derive(Debug)]
- pub struct CommandStatus {
-    pub code: Option<i32>,
-    pub success: bool,
-    pub signal: Option<i32>,
-    pub core_dumped: bool 
-}
-
 // Commands that separate inline commands.
 pub const SPLIT_COMMANDS:[&str;2] = ["then", "next"];
 // Commands wont be separated by shell by SPLIT_COMMANDS from point where logic operator is found, until "END" is reached.
@@ -34,7 +26,7 @@ pub fn detect_commands(commands:&[Vec<String>]) {
     this will be used by logic operators to find out if we can continue some operations or not
     Commands separation is done by split_commands()
     */
-    let mut returns: HashMap<usize, CommandStatus> = HashMap::new();
+    let mut returns: HashMap<usize, bool> = HashMap::new();
 
     while index < commands.len() {
         // Check whether the first argument is a keyword or not
@@ -64,7 +56,7 @@ pub fn detect_commands(commands:&[Vec<String>]) {
 }
 
 // Change working directory
-pub fn gt(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+pub fn gt(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
     // Check if there is just ONE argument
     // We can't go to more than one directory at the same time
     if args.len() == 1 {
@@ -93,7 +85,7 @@ pub fn gt(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus
 }
 
 // Just go away with specified exit code
-pub fn exit(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+pub fn exit(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
     if args.len() == 1 {
         report_failure(index, returns);
         process::exit(0)
@@ -114,7 +106,7 @@ pub fn exit(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStat
 }
 
 // Exit on special ocasions
-pub fn r#break(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+pub fn r#break(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
     if args.len() == 0 {
         process::exit(0)
     }
@@ -123,7 +115,7 @@ pub fn r#break(args:&[String], index:usize, returns:&mut HashMap<usize, CommandS
     }
 }
 
-fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>], stop:&mut bool) {
+fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, bool>, commands: &[Vec<String>], stop:&mut bool) {
     if *index_of_then == 0 {
         eprintln!("SYNTAX ERROR! Operator \"THEN\" doesn't work when there is nothing before it!");
         report_failure(*index_of_then, returns);
@@ -139,12 +131,12 @@ fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, c
     // Compare exit status of previous and following commands
     let prev_index = *index_of_then-1;
     if returns.contains_key(&prev_index) {
-        returns.get(&prev_index).unwrap().success
+        returns.get(&prev_index).unwrap()
     }
     else {
         eprintln!("OPERATOR \"THEN\" FAILED! Unable to read exit code of the previous command!");
         *stop=true;
-        false
+        &false
     };
 
     // Go to the 'end' keyword
@@ -165,12 +157,12 @@ fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, c
 // This is usefull because typically we don't want the shell to abnormally quit when syntax of "if" statement is incorrect
 // Instead, we just want to say "Hey! There is a bug!"
 // BUT when rush would work as a subshell just to execute a script, we won't even need it anymore
-pub fn report_success(index:usize, returns:&mut HashMap<usize, CommandStatus>) {
-    let command_status = CommandStatus {code: Some(0),success: true,signal: None,core_dumped: false};
+pub fn report_success(index:usize, returns:&mut HashMap<usize, bool>) {
+    let command_status = true;
     returns.insert(index, command_status);
 }
-pub fn report_failure(index:usize, returns:&mut HashMap<usize, CommandStatus>) {
-    let command_status = CommandStatus {code: Some(1),success: false,signal: None,core_dumped: false};
+pub fn report_failure(index:usize, returns:&mut HashMap<usize, bool>) {
+    let command_status = false;
     returns.insert(index, command_status);
 }
 
@@ -364,7 +356,7 @@ pub fn strip_quotes(input:&str) -> String {
 }
 
 // This will be used to execute commands!
-pub fn exec(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+pub fn exec(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
     // Do nothing if nothing was requested
     // This might occur when the user presses ENTER without even typing anything
     if args.is_empty() || args[0].is_empty() {
@@ -380,12 +372,7 @@ pub fn exec(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStat
         },
         Ok(process) => {
             // If the command is possible to run, save it's status to "returns" variable
-            let command_status = CommandStatus {
-                code: process.code(),
-                success: process.success(),
-                signal: process.signal(),
-                core_dumped: process.core_dumped()
-            };
+            let command_status = process.success();
             returns.insert(index, command_status);
         },
     }
@@ -415,7 +402,7 @@ pub fn getoutput_exec(args:&[String]) -> process::Output {
     }
 }
 
-pub fn silent_exec(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+pub fn silent_exec(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
     // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and collect it's status to "returns"
     match process::Command::new(&args[0]).args(&args[1..]).stdout(Stdio::null()).status() { 
         Err(e) => {
@@ -424,12 +411,7 @@ pub fn silent_exec(args:&[String], index:usize, returns:&mut HashMap<usize, Comm
         },
         Ok(process) => {
             // If the command is possible to run, save it's status to "returns" variable
-            let command_status = CommandStatus {
-                code: process.code(),
-                success: process.success(),
-                signal: process.signal(),
-                core_dumped: process.core_dumped()
-            };
+            let command_status = process.success();
             returns.insert(index, command_status);
         },
     }
@@ -437,7 +419,7 @@ pub fn silent_exec(args:&[String], index:usize, returns:&mut HashMap<usize, Comm
 
 use std::env::var_os;
 use std::ffi::OsString;
-pub fn getenv(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+pub fn getenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
     // Check if there is just ONE argument
     // We can't check more than one variable at the same time
     if args.len() == 1 {
@@ -471,7 +453,7 @@ pub fn getenv(args:&[String], index:usize, returns:&mut HashMap<usize, CommandSt
 }
 
 use std::env::set_var;
-pub fn setenv(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+pub fn setenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
     // Check if there is just ONE argument
     // We can't set more than one variable at the same time
     if args.len() == 1 {

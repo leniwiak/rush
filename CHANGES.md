@@ -89,6 +89,7 @@ Now I have very large file that is VERY uncomfortable to read...
 Thanks Rust.
 
 - RUSH: Fixed bug, that allowed user to use empty variables in commands
+- *: Drop usage of "CommandsStatus" struct
 
 ### Waiting features:
 

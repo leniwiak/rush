@@ -49,7 +49,3 @@ path = "src/rush.rs"
 [[bin]]
 name = "sleep"
 path = "src/sleep.rs"
-
-[[bin]]
-name = "while"
-path = "src/while.rs"
