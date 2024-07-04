@@ -19,7 +19,147 @@ use std::os::unix::process::ExitStatusExt;
 // Commands that separate inline commands.
 pub const SPLIT_COMMANDS:[&str;2] = ["then", "next"];
 // Commands wont be separated by shell by SPLIT_COMMANDS from point where logic operator is found, until "END" is reached.
-pub const LOGIC_OPERATORS:[&str;2] = ["if", "loop"];
+pub const LOGIC_OPERATORS:[&str;3] = ["if", "loop", "while"];
+
+/* 
+This function was created to run super commands or any other commands.
+If non built-in command is inside some logical statements, don't do anything unless forced by logical statement
+*/
+pub fn detect_commands(commands:&[Vec<String>]) {
+    let mut index = 0;
+    let mut stop = false;
+    
+    /*
+    This variable contains all required information about exit codes and statuses reported by ALL invoked commands
+    this will be used by logic operators to find out if we can continue some operations or not
+    Commands separation is done by split_commands()
+    */
+    let mut returns: HashMap<usize, CommandStatus> = HashMap::new();
+
+    while index < commands.len() {
+        // Check whether the first argument is a keyword or not
+        if !stop {
+            match commands[index][0].as_str() {
+                "gt" => gt(&commands[index], index, &mut returns),
+                // "help" | "?" => help(),
+                "exit" | "quit" | "bye" => exit(&commands[index], index, &mut returns),
+                "break" => r#break(&commands[index], index, &mut returns),
+                "end" | "next" => (),
+                "getenv" | "get" => getenv(&commands[index], index, &mut returns),
+                "setenv" | "set" => setenv(&commands[index], index, &mut returns),
+                "then" => then(&mut index, &mut returns, commands, &mut stop),
+                "exec" => exec(&commands[index], index, &mut returns),
+                "panic" => panic!("Manually invoked panic message"),
+                
+                _ => exec(&commands[index], index, &mut returns)
+            };
+            if index < commands.len() {
+                index+=1;
+            };
+        }
+        else {
+            return;
+        };
+    }
+}
+
+// Change working directory
+pub fn gt(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+    // Check if there is just ONE argument
+    // We can't go to more than one directory at the same time
+    if args.len() == 1 {
+        eprintln!("Give me a directory path to go!");
+        // As usual, run this function to report a failure.
+        // "index" variable contains position of a command
+        // "returns" contains information about all return codes that were reported by commands
+        // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
+        report_failure(index, returns);
+    }
+    else if args.len() > 2 {
+        eprintln!("Cannot go to multiple directories simultaneously!");
+        report_failure(index, returns)
+    }
+    else {
+        match env::set_current_dir(&args[1]) { 
+            Err(e) => {
+                eprintln!("{}: Cannot go into this directory because of an error: {}", args[1], e.kind());
+                report_failure(index, returns);
+            },
+            Ok(_) => {
+                report_success(index, returns);
+            }
+        };
+    };
+}
+
+// Just go away with specified exit code
+pub fn exit(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+    if args.len() == 1 {
+        report_failure(index, returns);
+        process::exit(0)
+    }
+    else if args.len() > 2 {
+        report_failure(index, returns);
+        eprintln!("Cannot exit with multiple exit codes!");
+    }
+    else {
+        match args[1].parse::<i32>() {
+            Err(e) => {
+                eprintln!("Cannot exit with this code because of an error: {:?}", e.kind());
+                report_failure(index, returns);
+            },
+            Ok(code) => { report_success(index, returns); process::exit(code); },
+        }
+    };
+}
+
+// Exit on special ocasions
+pub fn r#break(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+    if args.len() == 0 {
+        process::exit(0)
+    }
+    else {
+        todo!();
+    }
+}
+
+fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>], stop:&mut bool) {
+    if *index_of_then == 0 {
+        eprintln!("SYNTAX ERROR! Operator \"THEN\" doesn't work when there is nothing before it!");
+        report_failure(*index_of_then, returns);
+        *stop=true;
+        return;
+    }
+    if *index_of_then == commands.len()-1 {
+        eprintln!("SYNTAX ERROR! Operator \"THEN\" doesn't work when there is nothing after it!");
+        report_failure(*index_of_then, returns);
+        *stop=true;
+        return;
+    }
+    // Compare exit status of previous and following commands
+    let prev_index = *index_of_then-1;
+    if returns.contains_key(&prev_index) {
+        returns.get(&prev_index).unwrap().success
+    }
+    else {
+        eprintln!("OPERATOR \"THEN\" FAILED! Unable to read exit code of the previous command!");
+        *stop=true;
+        false
+    };
+
+    // Go to the 'end' keyword
+    let aaaaaaaaaa = match commands.iter().position(|x| x[0] == "end") {
+        None => {
+            eprintln!("OPERATOR \"THEN\" FAILED! Unable to find \"END\" keyword!");
+            *stop=true;
+            return;
+        },
+        Some(a) => { a },
+    };
+
+    *index_of_then=aaaaaaaaaa;
+}
+
 
 // These functions will be used to report success or failure when built-in or super commands are running
 // This is usefull because typically we don't want the shell to abnormally quit when syntax of "if" statement is incorrect
@@ -34,7 +174,7 @@ pub fn report_failure(index:usize, returns:&mut HashMap<usize, CommandStatus>) {
     returns.insert(index, command_status);
 }
 
-pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_when_inside_logic_op:bool) -> Vec<Vec<String>> {
+pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_when_inside_logic_op:bool) -> Result<Vec<Vec<String>>, String> {
     // This list contains all commands passed by the user 
     let mut commands: Vec<Vec<String>> = Vec::new();
     // List of words in one command
@@ -56,6 +196,9 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_
         if let Some(w) = sp {
             // Get variable contents
             let variable_contents=env::var_os(w).unwrap_or_default();
+            if variable_contents.is_empty() {
+                return Err(format!("Variable \"{}\" is empty or undefinned", sp.unwrap()));
+            }
             // Remove current command
             words.remove(i);
             // Append contents of a variable
@@ -72,7 +215,7 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_
             println!("Word: {} at index: {}", words[index], index);
             let dont_die = words[index].clone();
             let word_splitted_by_newlines = dont_die.rsplit_terminator('\n');
-            dbg!(&word_splitted_by_newlines);
+            // dbg!(&word_splitted_by_newlines);
             // Remove old word from "words"
             words.remove(index);
             // Add new collection of words in place of older one
@@ -199,7 +342,7 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_
             };
         };
     }
-    commands
+    Ok(commands)
 }
 
 pub fn strip_quotes(input:&str) -> String {
@@ -289,5 +432,77 @@ pub fn silent_exec(args:&[String], index:usize, returns:&mut HashMap<usize, Comm
             };
             returns.insert(index, command_status);
         },
+    }
+}
+
+use std::env::var_os;
+use std::ffi::OsString;
+pub fn getenv(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+    // Check if there is just ONE argument
+    // We can't check more than one variable at the same time
+    if args.len() == 1 {
+        eprintln!("Give me a variable name to check!");
+        // As usual, run this function to report a failure.
+        // "index" variable contains position of a command
+        // "returns" contains information about all return codes that were reported by commands
+        // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
+        report_failure(index, returns);
+    }
+    else if args.len() > 2 {
+        eprintln!("Cannot check multiple variables simultaneously!");
+        report_failure(index, returns)
+    }
+    else {
+        let variable = match var_os(&args[1]) {
+            Some(ret) => ret,
+            None => { 
+                eprintln!("GETENV FAILED! Variable \"{}\" is not set!", args[1]);
+                report_failure(index, returns);
+                OsString::new()
+            }
+        };
+        if let Ok(a) = variable.into_string() {
+             if !a.is_empty() {
+                println!("{}", a);
+             }
+        }
+        report_success(index, returns);
+    }
+}
+
+use std::env::set_var;
+pub fn setenv(args:&[String], index:usize, returns:&mut HashMap<usize, CommandStatus>) {
+    // Check if there is just ONE argument
+    // We can't set more than one variable at the same time
+    if args.len() == 1 {
+        eprintln!("Give me a variable name to set!");
+        // As usual, run this function to report a failure.
+        // "index" variable contains position of a command
+        // "returns" contains information about all return codes that were reported by commands
+        // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
+        report_failure(index, returns);
+    }
+    else if args.len() > 2 {
+        eprintln!("Cannot set multiple variables simultaneously!");
+        report_failure(index, returns)
+    }
+    else {
+        match args[1].split_once('=') {
+            Some((key, value)) => {
+                if key.is_empty() || value.is_empty() {
+                    eprintln!("OPEATOR \"SETENV\" FAILED! Incorretly requested variable!");
+                    report_failure(index, returns);
+                }
+                else {
+                    set_var(key, value);
+                    report_success(index, returns);
+                }
+            }
+            _ => {
+                eprintln!("OPEATOR \"SETENV\" FAILED! Incorretly requested variable!");
+                report_failure(index, returns);
+            }
+        };
+
     }
 }

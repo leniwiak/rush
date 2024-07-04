@@ -74,11 +74,33 @@
 ### Added on 3.07.2024
 
 - LOOP: Add this very simple loop
+- IF: Fixed bug that allowed user to write empty comparison statements
+
+### Added on 4.07.2024
+
+NOTE: Import system of the Rust languge is heavly broken!
+I can't import rush::detect_commands() nowhere, because it is a binary, so when I try to move detect_commands() to "helpful" library,
+compiler screams at me because functions used in detect_commands() can't be found (obviously, I have to "mod" them first)
+But using "mod" break EVERYTHING. I can't use "mod" in helpful, because helpful itself is "mod"ded in Rush which is a binary.
+What is the purpose of doing it like that? Can anyone from the Rust community explain it to me?
+
+For now, I've moved everything that detect_commands() depends on from other files to "helpful".
+Now I have very large file that is VERY uncomfortable to read...
+Thanks Rust.
+
+- RUSH: Fixed bug, that allowed user to use empty variables in commands
 
 ### Waiting features:
 
 - MATH: Do the math stuff
-- WHILE, LOOP, MATCH, FOR: More logic operations
+- FOR: More logic operations
+- Allow user to use variable name in a word, for example: SOMETEXT$HEREFROMVARIABLE (Where $HERE is a variable)
+- Add "~" shortcut for user's home directory
+- Ability to use "!command" to quickly replace text with command's output
+- Add type specific functions for variables:
+    - INC: Quickly add one to numeric variable
+    - DEC: Quickly substract one to numeric variable
+    - TIE: Concatenate text
 
 # Release 0.4.0:
 

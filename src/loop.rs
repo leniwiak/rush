@@ -1,29 +1,16 @@
-/*
-Rust import system is so stupid that I can't import anything MY OWN modules in this particular project tree.
-Trying to use mod or use in any way does not help.
-
-The only solution that I found as of now is to create a directory named "IF" and then creating symbolic links to end.rs and helpful.rs.
-Then, I have to add "#![allow(clippy::duplicate_mod)]" to "rush.rs" to tell the compiler, that I want to ignore the fact, 
-that some modules are imported multiple times (like... WHAT???)
-
-It's just broken or I am sick and I can't read the docs properly to find the correct solution.
-TODO
-*/
-
-use std::collections::HashMap;
 use std::process;
 use carrot_libs::args;
-
 mod helpful;
 
 /*
 Example loop statement:
 
+set INDEX=1
 loop
     say "HELLO"
     say "GOOD MORNING"
     say "GOODBYE!"
-    break
+    break cmp $INDEX = 1
     say "THIS SHOULD NEVER BE EXECUTED!"
 end
 
@@ -74,21 +61,11 @@ all_commands - List of commands splitted by LOOP-specific SPLIT_COMMANDS constan
 */
 fn magic(all_commands:&[String]) {
     loop {
-        let task_commands = helpful::split_commands(all_commands.to_owned(), helpful::SPLIT_COMMANDS.to_vec(), false);
+        let task_commands = match helpful::split_commands(all_commands[..all_commands.len()-1].to_owned(), helpful::SPLIT_COMMANDS.to_vec(), false) {
+            Err(e) => {eprintln!("LOOP OPERATOR FAILED! {e}!"); process::exit(1)},
+            Ok(e) => e,
+        };
         //dbg!(&task_commands);
-        let mut idx = 0;
-        while idx < task_commands.len() {
-            //println!("Running: {}", task_commands[idx][0]);
-            if task_commands[idx][0] == "break" {
-                process::exit(0);
-            }
-            if task_commands[idx][0] == "end" || helpful::SPLIT_COMMANDS.contains(&task_commands[idx][0].as_str()) {
-                idx+=1;
-                continue;
-            }
-            helpful::exec(&task_commands[idx], 0, &mut HashMap::new());
-            idx+=1;
-        }
+        helpful::detect_commands(&task_commands);
     }
-    
 }

@@ -1,18 +1,12 @@
 use std::process;
 use std::env;
-use std::collections::HashMap;
 use carrot_libs::args;
 use carrot_libs::input;
 use serde_derive::{Deserialize, Serialize};
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::thread;
 
-mod exit;
-mod getenv;
-mod gt;
 mod helpful;
-mod setenv;
-use {exit::*, getenv::*, gt::*, helpful::*, setenv::*};
 
 #[derive(Serialize, Deserialize)]
 struct RushConfig {
@@ -87,86 +81,11 @@ fn init_input_mode() {
             }
         };
         // Separate commands from super commands
-        let commands = split_commands(console_input, SPLIT_COMMANDS.to_vec(), true);
+        let commands = helpful::split_commands(console_input, helpful::SPLIT_COMMANDS.to_vec(), true);
         // Execute those commands
-        detect_commands(commands);
-    };
-}
-
-/* 
-This function was created to run super commands or any other commands.
-If non built-in command is inside some logical statements, don't do anything unless forced by logical statement
-*/
-pub fn detect_commands(commands:Vec<Vec<String>>) {
-    let mut index = 0;
-    let mut stop = false;
-    
-    /*
-    This variable contains all required information about exit codes and statuses reported by ALL invoked commands
-    this will be used by logic operators to find out if we can continue some operations or not
-    Commands separation is done by split_commands()
-    */
-    let mut returns: HashMap<usize, CommandStatus> = HashMap::new();
-
-    while index < commands.len() {
-        // Check whether the first argument is a keyword or not
-        if !stop {
-            match commands[index][0].as_str() {
-                "gt" => gt(&commands[index], index, &mut returns),
-                // "help" | "?" => help(),
-                "exit" | "quit" | "bye" => exit(&commands[index], index, &mut returns),
-                "end" | "next" => (),
-                "getenv" | "get" => getenv(&commands[index], index, &mut returns),
-                "setenv" | "set" => setenv(&commands[index], index, &mut returns),
-                "then" => then(&mut index, &mut returns, &commands, &mut stop),
-                "exec" => helpful::exec(&commands[index], index, &mut returns),
-                "panic" => panic!("Manually invoked panic message"),
-                
-                _ => helpful::exec(&commands[index], index, &mut returns)
-            };
-            if index < commands.len() {
-                index+=1;
-            };
+        match commands {
+            Ok(a) => helpful::detect_commands(&a),
+            Err(e) => eprintln!("{e}!"),
         }
-        else {
-            return;
-        };
-    }
-}
-
-fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, CommandStatus>, commands: &[Vec<String>], stop:&mut bool) {
-    if *index_of_then == 0 {
-        eprintln!("SYNTAX ERROR! Operator \"THEN\" doesn't work when there is nothing before it!");
-        report_failure(*index_of_then, returns);
-        *stop=true;
-        return;
-    }
-    if *index_of_then == commands.len()-1 {
-        eprintln!("SYNTAX ERROR! Operator \"THEN\" doesn't work when there is nothing after it!");
-        report_failure(*index_of_then, returns);
-        *stop=true;
-        return;
-    }
-    // Compare exit status of previous and following commands
-    let prev_index = *index_of_then-1;
-    if returns.contains_key(&prev_index) {
-        returns.get(&prev_index).unwrap().success
-    }
-    else {
-        eprintln!("OPERATOR \"THEN\" FAILED! Unable to read exit code of the previous command!");
-        *stop=true;
-        false
     };
-
-    // Go to the 'end' keyword
-    let aaaaaaaaaa = match commands.iter().position(|x| x[0] == "end") {
-        None => {
-            eprintln!("OPERATOR \"THEN\" FAILED! Unable to find \"END\" keyword!");
-            *stop=true;
-            return;
-        },
-        Some(a) => { a },
-    };
-
-    *index_of_then=aaaaaaaaaa;
 }

@@ -13,7 +13,6 @@ TODO
 use std::collections::HashMap;
 use std::process;
 use carrot_libs::args;
-
 mod helpful;
 
 // This command uses it's own set of splitting words
@@ -84,7 +83,7 @@ fn main() {
         process::exit(1);
     }
     if ! opts.contains(&"end".to_string()) {
-        dbg!(&opts);
+        //dbg!(&opts);
         eprintln!("SYNTAX ERROR! Missing \"END\" operator inside of an IF statement!");
         process::exit(1);
     }
@@ -96,10 +95,12 @@ fn main() {
     }
 
     // Split all arguments by splitting keywords
-    let all_commands = helpful::split_commands(args.clone(), SPLIT_COMMANDS.to_vec(), false);
+    let all_commands = match helpful::split_commands(args.clone(), SPLIT_COMMANDS.to_vec(), false) {
+        Err(e) => { eprintln!("IF OPERATOR FAILED! {e}!"); process::exit(1) },
+        Ok(e) => e,
+    };
     // Collect exit statuses here
     let mut returns: HashMap<usize, helpful::CommandStatus> = HashMap::new();
-
     
     let mut idx = 0;
     // Protect from writing "do end". The task cannot be empty.
@@ -110,7 +111,6 @@ fn main() {
     }
 
     let end_position = all_commands.iter().position(|x| x[0] == "end" ).unwrap();
-
     // dbg!(&all_commands);
     while idx != end_position {
         // println!("LET'S GO: {idx}!!!");
@@ -122,7 +122,6 @@ fn main() {
             }
         }
     }
-    
 }
 
 /*
@@ -136,7 +135,8 @@ returns - List of all return statuses from commands
 run_as_else - Indicate that we're running as "else" command
 */
 fn magic(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize, helpful::CommandStatus>, run_as_else:bool) {
-    // IF is not defined in options but let's assume that it's index number is zero.
+    // This is where current super operator (IF/ELSEIF/ELSE) is located in options
+    // TIP: IF is not defined in options but let's assume that it's index number is zero if we're starting IF logic.
     let super_operator_index = *idx;
 
     // Find out where closest jump spot is located
@@ -162,7 +162,10 @@ fn magic(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize
         let comparison_statement_commands = &all_commands[comparison_statement_starting_position..do_keyword_position].to_vec();
         // This is a list containing commands between DO and closest jump spot
         // NOTE: When separating task commands, do not use IF-specific SPLIT_COMMANDS. Use those defined in helpful instead.
-        let task_commands = helpful::split_commands(all_commands[do_keyword_position+1].to_owned(), helpful::SPLIT_COMMANDS.to_vec(), false);
+        let task_commands = match helpful::split_commands(all_commands[do_keyword_position+1].to_owned(), helpful::SPLIT_COMMANDS.to_vec(), false) {
+            Err(e) => {eprintln!("IF OPERATOR FAILED! {e}!"); process::exit(1)},
+            Ok(e) => e,
+        };
         // dbg!(&all_commands[do_keyword_position+1]);
 
         // Run all commands inside comparison statement
@@ -183,7 +186,7 @@ fn magic(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize
                 "or" => or(index, returns),
                 "not" => not(index, returns),
                 "else" | "elseif" | "end" | "if" => {
-                    eprintln!("SYNTAX ERROR! Operator \"{}\" was found in comparison statement!", comparison_statement_commands[index][0]);
+                    eprintln!("SYNTAX ERROR! Operator \"{}\" was found in a comparison statement!", comparison_statement_commands[index][0]);
                     process::exit(1);
                 },
                 _ => (),
@@ -202,7 +205,10 @@ fn magic(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize
     else {
         (
             true,
-            helpful::split_commands(all_commands[super_operator_index+1].to_vec(), helpful::SPLIT_COMMANDS.to_vec(), false)
+            match helpful::split_commands(all_commands[super_operator_index+1].to_vec(), helpful::SPLIT_COMMANDS.to_vec(), false) {
+                Err(e) => {eprintln!("IF OPERATOR FAILED! {e}!"); process::exit(1)},
+                Ok(e) => e,
+            }
         )
     };
 
@@ -245,12 +251,8 @@ fn check_statuses(returns:&HashMap<usize, helpful::CommandStatus>, start:usize, 
     ok
 }
 
-fn do_the_task(commands: Vec<Vec<String>>) {
-    // dbg!(&commands);
-    for c in commands {
-        // println!("Running: {:?}", c);
-        helpful::exec(&c, 0, &mut HashMap::new());
-    }
+pub fn do_the_task(commands: Vec<Vec<String>>) {
+    helpful::detect_commands(&commands);
 }
 
 // This checks exit code of commands executed before and after.
