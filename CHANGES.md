@@ -91,6 +91,12 @@ Thanks Rust.
 - RUSH: Fixed bug, that allowed user to use empty variables in commands
 - *: Drop usage of "CommandsStatus" struct
 
+# Release 0.3.5:
+
+### Added on 9.07.2024
+
+- RUSH: Fixed a bug that prevented user from writing a line with multiple commands that set and check some variable, like "set IDX=1 next echo $IDX"
+
 ### Waiting features:
 
 - MATH: Do the math stuff
@@ -101,7 +107,8 @@ Thanks Rust.
 - Add type specific functions for variables:
     - INC: Quickly add one to numeric variable
     - DEC: Quickly substract one to numeric variable
-    - TIE: Concatenate text
+    - GLUE: Concatenate text
+    - PART: Split text into pieces
 
 # Release 0.4.0:
 

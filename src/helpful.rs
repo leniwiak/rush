@@ -16,7 +16,7 @@ const IF_SPLIT_COMMANDS:[&str;8] = ["if", "elseif", "else", "and", "or", "not", 
 const IF_JUMP_SPOTS:[&str;3] = ["elseif", "else", "end"];
 
 /* 
-This function was created to run super commands or any other commands.
+This function was created to run commands with additional super commands detection.
 If non built-in command is inside some logical statements, don't do anything unless forced by logical statement
 */
 pub fn detect_commands(commands:&[Vec<String>]) {
@@ -31,21 +31,51 @@ pub fn detect_commands(commands:&[Vec<String>]) {
     let mut returns: HashMap<usize, bool> = HashMap::new();
 
     while index < commands.len() {
+        // Shortcut list containing all arguents of currently iterated command
+        let mut this_command = commands[index].clone();
+
+        // println!("Got command: {:?}", this_command);
+
+        // When there's a word that starts with "$"
+        // replace it with variable contents
+        let mut i = 0;
+        while i < this_command.len() {
+            // Save currently tested word to "w"
+            let w = &this_command[i];
+            // Remove unnecessary prefix ($varname -> varname)
+            let sp = w.strip_prefix('$');
+            // If contents of "w" are not empty, replace word with variable contents
+            if let Some(w) = sp {
+                // Get variable contents
+                let variable_contents=env::var_os(w).unwrap_or_default();
+                if variable_contents.is_empty() {
+                    eprintln!("Variable \"{}\" is empty or undefinned", sp.unwrap());
+                    stop=true;
+                    return;
+                }
+                // Remove current word from a command
+                this_command.remove(i);
+                // Append contents of a variable to a command
+                this_command.insert(i, variable_contents.into_string().unwrap_or_default());
+            }
+            i += 1;
+        };
+
         // Check whether the first argument is a keyword or not
         if !stop {
-            match commands[index][0].as_str() {
-                "gt" => gt(&commands[index], index, &mut returns),
+            match this_command[0].as_str() {
+                "gt" => gt(&this_command, index, &mut returns),
                 // "help" | "?" => help(),
-                "exit" | "quit" | "bye" => exit(&commands[index], index, &mut returns),
-                "break" => r#break(&commands[index], index, &mut returns),
+                "exit" | "quit" | "bye" => exit(&this_command, index, &mut returns),
+                "break" => r#break(&this_command, index, &mut returns),
                 "end" | "next" => (),
-                "getenv" | "get" => getenv(&commands[index], index, &mut returns),
-                "setenv" | "set" => setenv(&commands[index], index, &mut returns),
+                "getenv" | "get" => getenv(&this_command, index, &mut returns),
+                "setenv" | "set" => setenv(&this_command, index, &mut returns),
                 "then" => then(&mut index, &mut returns, commands, &mut stop),
-                "exec" => exec(&commands[index], index, &mut returns),
+                "exec" => exec(&this_command, index, &mut returns),
                 "panic" => panic!("Manually invoked panic message"),
                 
-                _ => exec(&commands[index], index, &mut returns)
+                _ => exec(&this_command, index, &mut returns)
             };
             if index < commands.len() {
                 index+=1;
@@ -188,28 +218,6 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_
     Expected output: ('af' 'file'), ('then'), ('ad' 'dir')
     */ 
 
-    // First of all, when there's a word that starts with "$"
-    // replace it with variable contents
-    let mut i = 0;
-    while i < words.len() {
-        // Save currently tested word to "w"
-        let w = &words[i];
-        // Remove unnecessary prefix ($varname -> varname)
-        let sp = w.strip_prefix('$');
-        // If contents of "w" are not empty, replace word with variable contents
-        if let Some(w) = sp {
-            // Get variable contents
-            let variable_contents=env::var_os(w).unwrap_or_default();
-            if variable_contents.is_empty() {
-                return Err(format!("Variable \"{}\" is empty or undefinned", sp.unwrap()));
-            }
-            // Remove current command
-            words.remove(i);
-            // Append contents of a variable
-            words.insert(i, variable_contents.into_string().unwrap_or_default());
-        }
-        i += 1;
-    };
    
     // Split commands in place of any new-line character
     let mut index = 0;
@@ -509,15 +517,16 @@ args - All options passed to this program in unchanged form.
 all_commands - List of commands splitted by IF-specific IF_SPLIT_COMMANDS constant. Usefull for comparison statement but not in the task.
 returns - List of all return statuses from commands
 run_as_else - Indicate that we're running as "else" command
-jump_spot_position - Index of nearest jump spot position can be found automatically (if none is sent) or set to a fixed value
+end_comparison - Index of nearest jump spot position can be found automatically (if none is sent) or set to a fixed value. This is usefull when make_comparison() is ran from break().
 */
-pub fn make_comparison(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize, bool>, run_as_else:bool, jump_spot_position:Option<usize>) {
+pub fn make_comparison(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize, bool>, run_as_else:bool, end_comparison:Option<usize>) {
     // This is where current super operator (IF/ELSEIF/ELSE) is located in options
     // TIP: IF is not defined in options but let's assume that it's index number is zero if we're starting IF logic.
     let super_operator_index = *idx;
 
     // Find out where closest jump spot is located
-    let jump_spot_position:usize = if let Some(a) = jump_spot_position {
+    // or use fixed value from "end_comparison" when running from the break().
+    let jump_spot_position:usize = if let Some(a) = end_comparison {
         a
     } else {
         all_commands.iter().position(|x| IF_JUMP_SPOTS.contains(&x[0].as_str())).unwrap()
@@ -529,7 +538,12 @@ pub fn make_comparison(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut
         let comparison_statement_starting_position = super_operator_index+1;
 
         // Find out where "DO" is located
-        let do_keyword_position = all_commands[super_operator_index..].iter().position(|x| x[0] == "do").unwrap() + super_operator_index;
+        // or use fixed value from "end_comparison" when running from the break().
+        let do_keyword_position:usize = if let Some(a) = end_comparison {
+            a
+        } else {
+            all_commands[super_operator_index..].iter().position(|x| x[0] == "do").unwrap() + super_operator_index
+        };
 
         // Protect from writing "if do", "elseif do" and "else do". "DO" have to be preceeded with something different than just a
         // super operator "if"
