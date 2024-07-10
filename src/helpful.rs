@@ -50,7 +50,6 @@ pub fn detect_commands(commands:&[Vec<String>]) {
                 let variable_contents=env::var_os(w).unwrap_or_default();
                 if variable_contents.is_empty() {
                     eprintln!("Variable \"{}\" is empty or undefinned", sp.unwrap());
-                    stop=true;
                     return;
                 }
                 // Remove current word from a command
@@ -138,22 +137,51 @@ pub fn exit(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
 }
 
 // Exit on special ocasions
-pub fn r#break(args:&[String], mut break_keyword_position:usize, returns:&mut HashMap<usize, bool>) {
+pub fn r#break(args:&[String], break_keyword_position:usize, returns:&mut HashMap<usize, bool>) {
     // Break if no arguments were passed to BREAK
     if args.len() == 1 {
         process::exit(0);
     }
     // Break if comparison statement returns success
     else {
-        // Split all arguments by IF specific IF_SPLIT_COMMANDS
-        let all_commands = match split_commands(args[1..].to_owned(), IF_SPLIT_COMMANDS.to_vec(), false) {
-            Err(e) => { eprintln!("IF OPERATOR FAILED! {e}!"); process::exit(1) },
+        //let comparison_statement_commands = &args[1..];
+        // Split all arguments by normal splitting keywords
+        let comparison_statement_commands = match split_commands(args[1..].to_vec(), SPLIT_COMMANDS.to_vec(), false) {
+            Err(e) => { eprintln!("BREAK OPERATOR FAILED! {e}!"); process::exit(1) },
             Ok(e) => e,
         };
-        // dbg!(&all_commands);
-        // Save position of break_keyword_position
-        let bruh = break_keyword_position;
-        make_comparison(&mut break_keyword_position, &all_commands, returns, false, Some(bruh+all_commands.len()))
+
+        // Run all commands inside comparison statement
+        let mut index = 0;
+        while index < comparison_statement_commands.len() {
+            // Execute all commands and collect their statuses to "returns"
+            if !SPLIT_COMMANDS.contains(&comparison_statement_commands[index][0].as_str()) {
+                silent_exec(&comparison_statement_commands[index], index+break_keyword_position, returns);
+            }
+            index += 1;
+        }
+
+        // When exit codes of all commands inside comparison statement are known - try executing AND, OR operators
+        let mut index = 0;
+        while index < comparison_statement_commands.len() && comparison_statement_commands[index][0] != "do" {
+            match comparison_statement_commands[index][0].as_str() {
+                "and" => and(index, returns),
+                "or" => or(index, returns),
+                "not" => not(index, returns),
+                "else" | "elseif" | "end" | "if" => {
+                    eprintln!("SYNTAX ERROR! Operator \"{}\" was found in a comparison statement!", comparison_statement_commands[index][0]);
+                    process::exit(1);
+                },
+                _ => (),
+            }
+            index+=1;
+        }
+
+        // Final check - Is every command in comparison statement successfull?
+        // dbg!(&returns, break_keyword_position, comparison_statement_commands.len()+break_keyword_position);
+        if check_statuses(returns, break_keyword_position, comparison_statement_commands.len()+break_keyword_position) {
+            process::exit(0);
+        }
     }
 }
 
@@ -517,20 +545,15 @@ args - All options passed to this program in unchanged form.
 all_commands - List of commands splitted by IF-specific IF_SPLIT_COMMANDS constant. Usefull for comparison statement but not in the task.
 returns - List of all return statuses from commands
 run_as_else - Indicate that we're running as "else" command
-end_comparison - Index of nearest jump spot position can be found automatically (if none is sent) or set to a fixed value. This is usefull when make_comparison() is ran from break().
 */
-pub fn make_comparison(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize, bool>, run_as_else:bool, end_comparison:Option<usize>) {
+pub fn make_comparison(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut HashMap<usize, bool>, run_as_else:bool) {
     // This is where current super operator (IF/ELSEIF/ELSE) is located in options
     // TIP: IF is not defined in options but let's assume that it's index number is zero if we're starting IF logic.
     let super_operator_index = *idx;
 
     // Find out where closest jump spot is located
     // or use fixed value from "end_comparison" when running from the break().
-    let jump_spot_position:usize = if let Some(a) = end_comparison {
-        a
-    } else {
-        all_commands.iter().position(|x| IF_JUMP_SPOTS.contains(&x[0].as_str())).unwrap()
-    };
+    let jump_spot_position = all_commands.iter().position(|x| IF_JUMP_SPOTS.contains(&x[0].as_str())).unwrap();
 
     let (shall_we_move_on, task_commands) = if !run_as_else {
         // Position of commands between IF/ELSEIF and DO
@@ -539,22 +562,22 @@ pub fn make_comparison(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut
 
         // Find out where "DO" is located
         // or use fixed value from "end_comparison" when running from the break().
-        let do_keyword_position:usize = if let Some(a) = end_comparison {
-            a
-        } else {
-            all_commands[super_operator_index..].iter().position(|x| x[0] == "do").unwrap() + super_operator_index
-        };
+        let do_keyword_position = all_commands[super_operator_index..].iter().position(|x| x[0] == "do").unwrap();
 
         // Protect from writing "if do", "elseif do" and "else do". "DO" have to be preceeded with something different than just a
-        // super operator "if"
+        // super operator if/else or elseif
+        // DO NOT run this test when end_comparison is defined. That means, we are running from
+        // break(), so "do" keyword is not present!
         if do_keyword_position == super_operator_index+1 {
+            // eprintln!("{super_operator_index} {do_keyword_position}");
             eprintln!("SYNTAX ERROR! Comparison statement is empty!");
             process::exit(1);
         }
 
         // This is a list containing everything between current IF/ELSEIF/ELSE and DO
-        // dbg!(comparison_statement_starting_position, do_keyword_position);
+        // dbg!(&all_commands, comparison_statement_starting_position, do_keyword_position);
         let comparison_statement_commands = &all_commands[comparison_statement_starting_position..do_keyword_position].to_vec();
+
         // This is a list containing commands between DO and closest jump spot
         // NOTE: When separating task commands, do not use IF-specific SPLIT_COMMANDS. Use those defined in helpful instead.
         let task_commands = match split_commands(all_commands[do_keyword_position+1].to_owned(), SPLIT_COMMANDS.to_vec(), false) {
@@ -633,8 +656,8 @@ pub fn check_statuses(returns:&HashMap<usize, bool>, start:usize, end:usize) -> 
     //dbg!(returns, start, end);
     let mut index = start;
     while index < end {
-        // dbg!(returns.get(&index).unwrap());
         // If there is at least one unsuccessfull command - quit
+        // println!("Looking for result with index: {index}");
         if !returns.get(&index).unwrap() {
             ok = false;
             break;

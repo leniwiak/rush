@@ -115,8 +115,8 @@ fn main() {
     while idx != end_position {
         // println!("LET'S GO: {idx}!!!");
         match all_commands[idx][0].as_str() {
-            "if" | "elseif" => make_comparison(&mut idx, &all_commands, &mut returns, false, None),
-            "else" => make_comparison(&mut idx, &all_commands, &mut returns, true, None),
+            "if" | "elseif" => make_comparison(&mut idx, &all_commands, &mut returns, false),
+            "else" => make_comparison(&mut idx, &all_commands, &mut returns, true),
             a => {
                 panic!("Internal error! Logic jumped to unknown super operator: {a}!");
             }

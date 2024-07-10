@@ -97,6 +97,12 @@ Thanks Rust.
 
 - RUSH: Fixed a bug that prevented user from writing a line with multiple commands that set and check some variable, like "set IDX=1 next echo $IDX"
 
+# Release 0.3.6:
+
+### Added on 10.07.2024
+
+- LOOP: Breaking out of loop under special conditions **should** work
+
 ### Waiting features:
 
 - MATH: Do the math stuff
