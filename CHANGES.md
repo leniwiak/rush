@@ -102,14 +102,12 @@ Thanks Rust.
 ### Added on 10.07.2024
 
 - LOOP: Breaking out of loop under special conditions **should** work
+- Add "~" shortcut to access user's home directory path
 
 ### Waiting features:
 
 - MATH: Do the math stuff
 - FOR: More logic operations
-- Allow user to use variable name in a word, for example: SOMETEXT$HEREFROMVARIABLE (Where $HERE is a variable)
-- Add "~" shortcut for user's home directory
-- Ability to use "!command" to quickly replace text with command's output
 - Add type specific functions for variables:
     - INC: Quickly add one to numeric variable
     - DEC: Quickly substract one to numeric variable

@@ -36,26 +36,48 @@ pub fn detect_commands(commands:&[Vec<String>]) {
 
         // println!("Got command: {:?}", this_command);
 
-        // When there's a word that starts with "$"
+        // When there's a word that starts with some particular character,
         // replace it with variable contents
         let mut i = 0;
         while i < this_command.len() {
-            // Save currently tested word to "w"
-            let w = &this_command[i];
-            // Remove unnecessary prefix ($varname -> varname)
-            let sp = w.strip_prefix('$');
-            // If contents of "w" are not empty, replace word with variable contents
-            if let Some(w) = sp {
+            // Dolar sign is used to replace variable name with it's contents
+            // Save currently tested word to "word"
+            let word = &this_command[i];
+
+            if word.starts_with('$') {
+                // Remove unnecessary prefix ($varname -> varname)
+                let stripped_prefix = word.strip_prefix('$');
+                // If contents of "w" are not empty, replace word with variable contents
+                if let Some(w) = stripped_prefix {
+                    // Get variable contents
+                    let variable_contents=env::var_os(w).unwrap_or_default();
+                    if variable_contents.is_empty() {
+                        eprintln!("ILLEGAL OPERATION! Mentioned variable \"{}\" is empty or undefinned!", stripped_prefix.unwrap());
+                        return;
+                    }
+                    // Remove current word from a command
+                    this_command.remove(i);
+                    // Append contents of a variable to a command
+                    this_command.insert(i, variable_contents.into_string().unwrap_or_default());
+                }
+            }
+            else if word.starts_with('~') {
+                // Tilde will be replaced with user's full home directory path
                 // Get variable contents
-                let variable_contents=env::var_os(w).unwrap_or_default();
-                if variable_contents.is_empty() {
-                    eprintln!("Variable \"{}\" is empty or undefinned", sp.unwrap());
+                let homedir=env::var_os("HOME").unwrap_or_default().into_string().unwrap();
+                if homedir.is_empty() {
+                    eprintln!("ILLEGAL OPERATION! User's home directory path is undefinned!");
                     return;
                 }
+                // Remove tilde from currently iterated word
+                let mut modified_word = word.strip_prefix('~').unwrap().to_string();
+                // Add homedir path to the start of the word
+                modified_word.insert_str(0, &homedir);
+
                 // Remove current word from a command
                 this_command.remove(i);
                 // Append contents of a variable to a command
-                this_command.insert(i, variable_contents.into_string().unwrap_or_default());
+                this_command.insert(i, modified_word.to_owned());
             }
             i += 1;
         };
