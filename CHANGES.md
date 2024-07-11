@@ -104,13 +104,17 @@ Thanks Rust.
 - LOOP: Breaking out of loop under special conditions **should** work
 - Add "~" shortcut to access user's home directory path
 
+# Release 0.3.7:
+
+### Added on 11.07.2024
+
+- RUSH: Added $varname++ and $varname-- syntax to quickly increase/decrease a variable's value
+
 ### Waiting features:
 
 - MATH: Do the math stuff
 - FOR: More logic operations
 - Add type specific functions for variables:
-    - INC: Quickly add one to numeric variable
-    - DEC: Quickly substract one to numeric variable
     - GLUE: Concatenate text
     - PART: Split text into pieces
 

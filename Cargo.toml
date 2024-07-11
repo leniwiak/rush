@@ -1,6 +1,6 @@
 [package]
 name = "rush"
-version = "0.3.6"
+version = "0.3.7"
 edition = "2021"
 
 [build]
@@ -23,6 +23,7 @@ signal-hook = "*"
 confy = "*"
 serde = "*"
 serde_derive = "*"
+num-bigint = "*"
 
 [dependencies.carrot_libs]
 path = "../carrot-libs"

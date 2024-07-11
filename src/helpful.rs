@@ -5,6 +5,8 @@ use std::process;
 use std::process::Stdio;
 use std::io;
 use std::io::Write;
+use carrot_libs::system;
+use num_bigint::BigInt;
 
 // Commands that separate inline commands.
 pub const SPLIT_COMMANDS:[&str;2] = ["then", "next"];
@@ -44,7 +46,7 @@ pub fn detect_commands(commands:&[Vec<String>]) {
             // Save currently tested word to "word"
             let word = &this_command[i];
 
-            if word.starts_with('$') {
+            if word.starts_with('$') && (!word.ends_with("++") && !word.ends_with("--")) {
                 // Remove unnecessary prefix ($varname -> varname)
                 let stripped_prefix = word.strip_prefix('$');
                 // If contents of "w" are not empty, replace word with variable contents
@@ -52,7 +54,7 @@ pub fn detect_commands(commands:&[Vec<String>]) {
                     // Get variable contents
                     let variable_contents=env::var_os(w).unwrap_or_default();
                     if variable_contents.is_empty() {
-                        eprintln!("ILLEGAL OPERATION! Mentioned variable \"{}\" is empty or undefinned!", stripped_prefix.unwrap());
+                        eprintln!("ILLEGAL OPERATION! Mentioned variable is empty or undefinned: {}!", stripped_prefix.unwrap());
                         return;
                     }
                     // Remove current word from a command
@@ -78,6 +80,45 @@ pub fn detect_commands(commands:&[Vec<String>]) {
                 this_command.remove(i);
                 // Append contents of a variable to a command
                 this_command.insert(i, modified_word.to_owned());
+            }
+            else if word.starts_with('$') && (word.ends_with("++") || word.ends_with("--")) {
+                let addition = word.ends_with("++");
+                // ++varname will be replaced with contents of a variable with one added to it
+                // NOTE: This will only work if a variable contains a number
+                
+                // Remove "$" (if any) and "++" or "--" from currently iterated word
+                let mut modified_word = word.strip_prefix('$').unwrap().to_string();
+                modified_word = if addition {
+                    modified_word.strip_suffix("++").unwrap().to_string()
+                }
+                else {
+                    modified_word.strip_suffix("--").unwrap().to_string()
+                };
+                // Get variable contents
+                let variable_contents=env::var_os(&modified_word).unwrap_or_default().into_string().unwrap();
+                if variable_contents.is_empty() {
+                    eprintln!("ILLEGAL OPERATION! Calculation failed because variable is empty or undefinned: {}!", modified_word);
+                    return;
+                }
+                let mut parsed_variable = match variable_contents.parse::<BigInt>() {
+                    Ok(res) => res,
+                    Err(_) => {
+                        eprintln!("ILLEGAL OPERATION! Calculation failed because variable is not a number: {}!", modified_word);
+                        return;
+                    },
+                };
+                // Add/substract one to/from a parsed variable
+                if addition {
+                    parsed_variable+=1;
+                } else {
+                    parsed_variable-=1;
+                }
+                // Save new variable contents to environment
+                set_var(modified_word, parsed_variable.to_string());
+                // Remove current word from a command
+                this_command.remove(i);
+                // Append contents of a variable to a command
+                this_command.insert(i, parsed_variable.to_string());
             }
             i += 1;
         };
@@ -535,14 +576,18 @@ pub fn setenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
         report_failure(index, returns);
     }
     else if args.len() > 2 {
-        eprintln!("Cannot set multiple variables simultaneously!");
+        eprintln!("OPERATOR \"SETENV\" FAILED! Cannot set multiple variables simultaneously!");
         report_failure(index, returns)
     }
     else {
         match args[1].split_once('=') {
             Some((key, value)) => {
+                if system::check_simple_characters_compliance(key).is_err() {
+                    eprintln!("OPEATOR \"SETENV\" FAILED! Variable name contains invalid characters: {key}!");
+                    report_failure(index, returns);
+                }
                 if key.is_empty() || value.is_empty() {
-                    eprintln!("OPEATOR \"SETENV\" FAILED! Incorretly requested variable!");
+                    eprintln!("OPEATOR \"SETENV\" FAILED! Variable name or value is empty!");
                     report_failure(index, returns);
                 }
                 else {
@@ -551,7 +596,7 @@ pub fn setenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
                 }
             }
             _ => {
-                eprintln!("OPEATOR \"SETENV\" FAILED! Incorretly requested variable!");
+                eprintln!("OPEATOR \"SETENV\" FAILED! Variable name or value is empty!");
                 report_failure(index, returns);
             }
         };
