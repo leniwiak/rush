@@ -109,6 +109,7 @@ Thanks Rust.
 ### Added on 11.07.2024
 
 - RUSH: Added $varname++ and $varname-- syntax to quickly increase/decrease a variable's value
+- RUSH: Code responsible for removing quotes from enquoted sentences was moved to the detect_commands() function. User does not need to see the quoted on the output - but the shell needs it. If word is enquoted, special characters like ~, $, ++ or -- won't be resolved.
 
 ### Waiting features:
 

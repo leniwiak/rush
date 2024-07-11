@@ -123,6 +123,16 @@ pub fn detect_commands(commands:&[Vec<String>]) {
             i += 1;
         };
 
+        // Remove quotes from words
+        // If strip_quotes find and (hopefuly) removes quotes, the for loop will
+        // remove enquoted word and replace it with a new one
+        for (i, w) in this_command.clone().iter().enumerate() {
+            if let Some(dequoted) = strip_quotes(w) {
+                this_command.remove(i);
+                this_command.insert(i, dequoted);
+            };
+        }
+
         // Check whether the first argument is a keyword or not
         if !stop {
             match this_command[0].as_str() {
@@ -314,8 +324,8 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_
     let mut index = 0;
     while index < words.len() {
         if words[index].contains('\n') && !words[index].ends_with('\n') {
-            println!("Got a newline!");
-            println!("Word: {} at index: {}", words[index], index);
+            // println!("Got a newline!");
+            // println!("Word: {} at index: {}", words[index], index);
             let dont_die = words[index].clone();
             let word_splitted_by_newlines = dont_die.rsplit_terminator('\n');
             // dbg!(&word_splitted_by_newlines);
@@ -327,7 +337,7 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_
             }
             // Additionally, add "newline" keyword so the loop below will split commands where newline character was inserted
             words.insert(index, String::from("newline"));
-            dbg!(&words);
+            // dbg!(&words);
         }
         // If word ends with new line character, add "newline" AFTER the current word
         else if words[index].contains('\n') && words[index].ends_with('\n') {
@@ -355,11 +365,9 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_
             // Build one large argument from words in quotes
             let mut joined = String::new();
             loop {
-                // Remove quotes from word, if any
-                let stripped_word = strip_quotes(&words[index]);
                 // println!("Got stripped word: {}", stripped_word);
                 // Add word to 'joined' with additional space at the end
-                joined.push_str(&format!("{} ", stripped_word));
+                joined.push_str(&format!("{} ", words[index]));
                 // println!("Joined contents: {joined}");
                 // If we find the end of quotation
                 if words[index].ends_with('\'') || words[index].ends_with('"') {
@@ -448,22 +456,30 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_
     Ok(commands)
 }
 
-pub fn strip_quotes(input:&str) -> String {
+pub fn strip_quotes(input:&str) -> Option<String> {
+    let mut did_it_change = false;
     let mut output = input.to_string();
     if output.starts_with('\'') {
+        did_it_change = true;
         output = output.strip_prefix('\'').unwrap().to_string();
     }
     if output.starts_with('"') {
+        did_it_change = true;
         output = output.strip_prefix('"').unwrap().to_string();
     }
-
     if output.ends_with('\'') {
+        did_it_change = true;
         output = output.strip_suffix('\'').unwrap().to_string();
     }
     if output.ends_with('"'){
+        did_it_change = true;
         output = output.strip_suffix('"').unwrap().to_string();
     }
-    output
+    if did_it_change {
+        Some(output)
+    } else {
+        None
+    }
 }
 
 // This will be used to execute commands!
