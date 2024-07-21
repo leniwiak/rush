@@ -11,11 +11,12 @@ use num_bigint::BigInt;
 // Commands that separate inline commands.
 pub const SPLIT_COMMANDS:[&str;2] = ["then", "next"];
 // Commands wont be separated by shell by SPLIT_COMMANDS from point where logic operator is found, until "END" is reached.
-pub const LOGIC_OPERATORS:[&str;3] = ["if", "loop", "while"];
+pub const LOGIC_OPERATORS:[&str;3] = ["if", "loop", "for"];
 
 //
 const IF_SPLIT_COMMANDS:[&str;8] = ["if", "elseif", "else", "and", "or", "not", "do", "end"];
 const IF_JUMP_SPOTS:[&str;3] = ["elseif", "else", "end"];
+const FOR_SPLIT_COMMANDS:[&str;8] = ["for", "in", "persign", "perword", "perline", "step", "do", "end"];
 
 /* 
 This function was created to run commands with additional super commands detection.
@@ -570,9 +571,18 @@ pub fn getenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
                 OsString::new()
             }
         };
-        if let Ok(a) = variable.into_string() {
-             if !a.is_empty() {
-                println!("{}", a);
+        if let Ok(res) = variable.into_string() {
+             if !res.is_empty() {
+                // If a variable is an array, separate it and show every item on a new line
+                if res.contains(':') {
+                    let res = res.split(':');
+                    for bruhitto in res {
+                        println!("{}", bruhitto);
+                    }
+                }
+                else {
+                    println!("{}", res);
+                }
              }
         }
         report_success(index, returns);
@@ -591,32 +601,30 @@ pub fn setenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
         // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
         report_failure(index, returns);
     }
-    else if args.len() > 2 {
-        eprintln!("OPERATOR \"SETENV\" FAILED! Cannot set multiple variables simultaneously!");
+    else if args.len() == 2 {
+        eprintln!("OPERATOR \"SETENV\" FAILED! Give me the contents to save");
         report_failure(index, returns)
     }
     else {
-        match args[1].split_once('=') {
-            Some((key, value)) => {
-                if system::check_simple_characters_compliance(key).is_err() {
-                    eprintln!("OPEATOR \"SETENV\" FAILED! Variable name contains invalid characters: {key}!");
-                    report_failure(index, returns);
-                }
-                if key.is_empty() || value.is_empty() {
-                    eprintln!("OPEATOR \"SETENV\" FAILED! Variable name or value is empty!");
-                    report_failure(index, returns);
-                }
-                else {
-                    set_var(key, value);
-                    report_success(index, returns);
-                }
-            }
-            _ => {
-                eprintln!("OPEATOR \"SETENV\" FAILED! Variable name or value is empty!");
-                report_failure(index, returns);
-            }
+        // Allow user to set variables with proper letters only
+        if system::check_simple_characters_compliance(&args[1]).is_err() {
+            eprintln!("OPEATOR \"SETENV\" FAILED! Variable name contains invalid characters: {}!", args[1]);
+            report_failure(index, returns);
+        }
+        if args[1].is_empty() || args[2..].is_empty() {
+            eprintln!("OPEATOR \"SETENV\" FAILED! Variable name or value is empty!");
+            report_failure(index, returns);
+        }
+        // Value must contain contents of arg 2+
+        let mut value = String::new();
+        for a in &args[2..] {
+            value.push_str(&format!("{} ", a));
         };
 
+        // trim _end() is going to remove any trailing white characters at the end
+        // variable contents so contents will be more clean.
+        set_var(&args[1], value.trim_end());
+        report_success(index, returns);
     }
 }
 

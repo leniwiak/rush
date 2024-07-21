@@ -1,6 +1,6 @@
 use std::process;
 use carrot_libs::args;
-// This is how to import other rush files when the current source file is defined as binary in Cargo.toml
+use num_bigint::BigInt;
 mod helpful;
 use crate::helpful::*;
 
@@ -20,19 +20,15 @@ FOR TEXT VALUES:
     ~           Contained
     != / =!     Different
 
-When you want to use the output of a command while comparing - use [command]
+When you want to use command's STDOUT of while comparing - use :command
+When you want to use command's STDERR of while comparing - use ERR:command
+When you want to use command's exit code while comparing - use CODE:command
 When you want to use the output of a variable while comparing - use $variable
 */
 fn main() {
-    let opts = args::opts();
-    let (swcs, vars) = args::swcs();
+    let args = args::args();
 
-    if !swcs.is_empty() || !vars.is_empty() {
-        eprintln!("Operator \"cmp\" doesn't support any switches nor it's values!");
-        process::exit(1);
-    }
-
-    if opts.len() < 3 {
+    if args.len() < 4 {
         eprintln!("Operator \"cmp\" doesn't work when there's nothing to compare!");
         process::exit(1);
     }
@@ -44,20 +40,20 @@ fn main() {
     // List of known operators
     let operators = [">", "<", "=>", ">=", "=<", "<=", "=", "==", "!=", "=!", "~"];
 
-    let mut i = 0;
-    while i < opts.len() {
-        let curop = &opts[i].as_str();
+    let mut i = 1;
+    while i < args.len() {
+        let curop = &args[i].as_str();
         if operators.contains(curop) && i == 0 {
             eprintln!("SYNTAX ERROR! Missing left value before operator!");
             process::exit(1);
         }
         if operators.contains(curop) && i > 0 {
-            for opt in opts[..i].iter() {
-                left.push_str(&format!("{opt} "));
+            for arg in args[1..i].iter() {
+                left.push_str(&format!("{} ", arg));
             }
-            action.clone_from(&opts[i]);
-            for opt in opts[i+1..].iter() {
-                right.push_str(&format!("{opt} "));
+            action.clone_from(&args[i]);
+            for arg in args[i+1..].iter() {
+                right.push_str(&format!("{} ", arg));
             }
         }   
         i+=1;
@@ -69,21 +65,21 @@ fn main() {
 
     // Replace contents of left/right operator with the output of a command
     // if requested text starts with a colon or "ERR:" or "CODE:"
-    left = replace_contents(left.strip_suffix(' ').unwrap().to_string());
-    right = replace_contents(right.strip_suffix(' ').unwrap().to_string());
+    left = replace_contents(left.to_string());
+    right = replace_contents(right.to_string());
 
     // Are we comparing numbers?
-    let left_is_numeric = left.parse::<usize>().is_ok();
-    let right_is_numeric = right.parse::<usize>().is_ok();
-    // dbg!(left_is_numeric, right_is_numeric);
+    let left_is_numeric = left.trim().parse::<BigInt>().is_ok();
+    let right_is_numeric = right.trim().parse::<BigInt>().is_ok();
+    //dbg!(&left, left_is_numeric, &right, right_is_numeric);
 
     // The variable "comparison_status" will be used by process::exit to return 0 or 1
     let comparison_status:bool;
     // Compare data
     match (left_is_numeric, right_is_numeric) {
         (true, true) => {
-            let left_number = left.parse::<usize>().unwrap();
-            let right_number = right.parse::<usize>().unwrap();
+            let left_number = left.trim().parse::<BigInt>().unwrap();
+            let right_number = right.trim().parse::<BigInt>().unwrap();
             comparison_status = match action.as_str() {
                 ">" => left_number > right_number,
                 "<" => left_number < right_number,
@@ -110,15 +106,17 @@ fn main() {
         }
         _ => {
             eprintln!("OPERATOR \"CMP\" FAILED! Values differ in type!");
+            //dbg!(left_is_numeric, right_is_numeric);
             process::exit(1);
         }
     };
 
     // Exit from the program either successfully or not
     if comparison_status {
-        println!("OK");
+        println!("TRUE");
         process::exit(0);
     } else {
+        println!("FALSE");
         process::exit(1);
     }
 }
@@ -137,10 +135,10 @@ fn replace_contents(text:String) -> String {
         
         // Make a list of words because "cmd_content" does not allow strings
         let mut ewygerfeue = Vec::new();
-        println!("{}", command.unwrap());
+        // println!("{}", command.unwrap());
         for w in command.unwrap().split_whitespace() {
             ewygerfeue.push(w.to_string());
-            println!("{:?}", ewygerfeue);
+            // println!("{:?}", ewygerfeue);
         }
         
         let output = getoutput_exec(&ewygerfeue);

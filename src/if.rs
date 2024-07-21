@@ -23,10 +23,10 @@ const SPLIT_COMMANDS:[&str;8] = ["if", "elseif", "else", "and", "or", "not", "do
 While working with this code, it might be usefull for you to get used to some of my own terminology.
 I don't know if names of parts of IF statements are standarized somewhere or something like that but nevermind...
 
-just know that many of the functions, variables, comments and lot's of other stuff in the code below uses some magical
-words because...
+Just know that many of the functions, variables, comments and lot's of other stuff in the code below uses some magical
+words because I have to name them somehow.
 
-The whole code below is an example of an IF statement. Everything starting with an "IF" and ending with an "END" is an IF statement.
+The whole code below is an example of an IF statement. Everything from "IF" to "END" is an IF statement.
 
 -- This is an "IF" keyword. It starts this particular type of logic.
 -- "IF", "ELSEIF" and "ELSE" are called "super operators".
@@ -36,7 +36,7 @@ The whole code below is an example of an IF statement. Everything starting with 
 |   |        -- This is an "OR" keyword. Both "OR" and "AND" (not used in this example) keywords are called "operators".
 |   |        |
 |   |        |             -- This is a "DO" keyword. It's also called a "summarizer" because it sums up all the return codes
-|   |        |             -- from commands in a "comparison statement". If everythig went fine (returned a success) - execute a "task"
+|   |        |             -- from commands in a "comparison statement". If everything went fine (returned a success) - execute a "task"
 |   |        |             -- if not (there is at least one command that returned a failure) - skip a "task" (I'll explain this in a moment)
 |   |        |             -- and jump to "jump spot" (Will explain this too).
 |   |        |             |
@@ -67,7 +67,7 @@ fn main() {
     };
 
     if opts.is_empty() {
-        eprintln!("The \"IF\" statement requires at least one argument!");
+        eprintln!("The \"IF\" statement requires some arguments!");
         process::exit(1);
     }
     

@@ -36,6 +36,14 @@ name = "cmp"
 path = "src/cmp.rs"
 
 [[bin]]
+name = "for"
+path = "src/for.rs"
+
+[[bin]]
+name = "glue"
+path = "src/glue.rs"
+
+[[bin]]
 name = "if"
 path = "src/if.rs"
 

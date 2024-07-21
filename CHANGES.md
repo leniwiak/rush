@@ -111,13 +111,18 @@ Thanks Rust.
 - RUSH: Added $varname++ and $varname-- syntax to quickly increase/decrease a variable's value
 - RUSH: Code responsible for removing quotes from enquoted sentences was moved to the detect_commands() function. User does not need to see the quoted on the output - but the shell needs it. If word is enquoted, special characters like ~, $, ++ or -- won't be resolved.
 
+# Release 0.3.8:
+
+### Added on 12.07.2024
+
+- CMP: Use BigInt instead of usize
+- CMP: Support for negative numbers
+- GLUE: Ability to join arguments
+
 ### Waiting features:
 
 - MATH: Do the math stuff
 - FOR: More logic operations
-- Add type specific functions for variables:
-    - GLUE: Concatenate text
-    - PART: Split text into pieces
 
 # Release 0.4.0:
 
