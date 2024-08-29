@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::process;
@@ -7,6 +8,21 @@ use std::io;
 use std::io::Write;
 use carrot_libs::system;
 use num_bigint::BigInt;
+
+#[derive(Serialize, Deserialize)]
+pub struct RushConfig {
+    pub prompt: String,
+    pub aliases: HashMap<String, String>,
+}
+// `Default` settings for `MyConfig`
+impl ::std::default::Default for RushConfig {
+    fn default() -> Self { 
+        Self { 
+            prompt: "> ".into(),
+            aliases: HashMap::new(),
+        } 
+    }
+}
 
 // Commands that separate inline commands.
 pub const SPLIT_COMMANDS:[&str;2] = ["then", "next"];
@@ -142,6 +158,7 @@ pub fn detect_commands(commands:&[Vec<String>]) {
                 "exit" | "quit" | "bye" => exit(&this_command, index, &mut returns),
                 "break" => r#break(&this_command, index, &mut returns),
                 "end" | "next" => (),
+                "alias" => alias(&this_command, index, &mut returns),
                 "getenv" | "get" => getenv(&this_command, index, &mut returns),
                 "setenv" | "set" => setenv(&this_command, index, &mut returns),
                 "unsetenv" | "unset" => unsetenv(&this_command, index, &mut returns),
@@ -260,6 +277,34 @@ pub fn r#break(args:&[String], break_keyword_position:usize, returns:&mut HashMa
     }
 }
 
+pub fn alias(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
+    // Check if there is just ONE argument
+    // We can't set more than one variable at the same time
+    if args.len() == 1 {
+        eprintln!("Give me at least one alias name to check!");
+        // As usual, run this function to report a failure.
+        // "index" variable contains position of a command
+        // "returns" contains information about all return codes that were reported by commands
+        // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
+        report_failure(index, returns);
+    }
+    else {
+        let cfg:RushConfig = match confy::load("rush", "rush") {
+            Err(e) => { eprintln!("Failed to read config file: {}!", e); process::exit(1)},
+            Ok(e) => e,
+        };
+        let aliases = cfg.aliases;
+
+        for arg in args.iter().skip(1) {
+            match aliases.get_key_value(arg) {
+                None => eprintln!("{}: Alias not set!", arg),
+                Some(e) => eprintln!("{}", e.1),
+            };
+        }
+        report_success(index, returns);
+    } 
+}
+
 fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, bool>, commands: &[Vec<String>], stop:&mut bool) {
     if *index_of_then == 0 {
         eprintln!("SYNTAX ERROR! Operator \"THEN\" doesn't work when there is nothing before it!");
@@ -293,7 +338,6 @@ fn then(index_of_then:&mut usize, returns: &mut HashMap<usize, bool>, commands: 
         },
         Some(a) => { a },
     };
-
     *index_of_then=aaaaaaaaaa;
 }
 
@@ -320,7 +364,6 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_
     This will be used to separate built-in commands from anything else
     Expected output: ('af' 'file'), ('then'), ('ad' 'dir')
     */ 
-
    
     // Split commands in place of any new-line character
     let mut index = 0;
@@ -348,17 +391,46 @@ pub fn split_commands(mut words:Vec<String>, spliting_keywords:Vec<&str>, split_
         index += 1;
     }
 
-    let mut index = 0;
+    // (Almost) always replace aliased words with their value
+    // TIP: Don't do anything if previous word is "alias",
+    // Writing the name of "alias" command and using aliased word typically means that user wants to check
+    // if alias is set. This is an exception to the rule above
+    let cfg:RushConfig = confy::load("rush", "rush").unwrap();
+    // TIP: Using .unwrap() above is okay. We couldn't even load the shell if loading config file would be impossible
+
+    if !cfg.aliases.is_empty() {
+        let mut index = 0;
+        while index < words.len() {
+            if cfg.aliases.contains_key(&words[index]) && !(index != 0 && words[index-1] == "alias") {
+                if let Some(ret) = cfg.aliases.get_key_value(&words[index]) {
+                    // Remove aliased word from the list of words
+                    words.remove(index);
+                    // Separate words by space in alias's value
+                    let words_in_alias_value = ret.1.split_whitespace();
+                    for w in words_in_alias_value.rev() {
+                        words.insert(index, w.to_owned());
+                    }
+                }
+            }
+            index += 1;
+        }
+    }
+
     /*
-    The shell was designed to NOT split commands if we're inside of some logic. (In IF statement, for example)
-    if cmp 11 = 11 do
+    The shell was designed NOT to split commands if we're inside of some logic. (In IF statement, for example)
+    The entire if statement block must be accessible for if command to work
+
+    In the code below, function split_commands() wouldn't split commands by newline character nor by the "next" keyword.
+    The IF statement should do this manually.
+
+    if cmp 11 = 11 then
         say "hello"
         say "it is equal to eleven" next say "so lucky."
     end
-
-    In the code above, function split_commands() wouldn't split commands by newline character nor by the "next" keyword.
-    The IF statement should do this manually.
     */
+
+    // Connect words in quotes
+    let mut index = 0;
     let mut logic_operators_depth = 0;
     let logic_operators = LOGIC_OPERATORS.to_vec();
     while index < words.len() {
@@ -613,7 +685,7 @@ pub fn setenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
             report_failure(index, returns);
         }
         if args[1].is_empty() || args[2..].is_empty() {
-            eprintln!("OPEATOR \"SETENV\" FAILED! Variable name or value is empty!");
+            eprintln!("OPEATOR \"SETENV\" FAILED! Variable name or it's value is empty!");
             report_failure(index, returns);
         }
         // Value must contain contents of arg 2+
@@ -623,7 +695,6 @@ pub fn setenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
         };
 
         // trim _end() is going to remove any trailing white characters at the end
-        // variable contents so contents will be more clean.
         set_var(&args[1], value.trim_end());
         report_success(index, returns);
     }
