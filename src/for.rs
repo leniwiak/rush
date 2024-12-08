@@ -39,12 +39,6 @@ fn main() {
         process::exit(1);
     };
     
-    // If there is any "FOR" in options, that means, that user probably requested "FOR" multiple times
-    // you can't do that while working with FORs
-    if args.contains(&"for".to_string()) {
-        eprintln!("SYNTAX ERROR! Repeated \"FOR\" operator inside a FOR statement!");
-        process::exit(1);
-    }
     // If these keywords are not present - The syntax is surelly incorrect
     if !args.contains(&"do".to_string()) {
         eprintln!("SYNTAX ERROR! Missing \"DO\" operator inside a FOR statement!");
@@ -122,9 +116,8 @@ fn main() {
     let between_sep_and_do = &args[position_of_separator+1..position_of_do];
 
     if between_sep_and_do.is_empty() {
-        panic!("Program's logic contradicts itself! Please, report a bug!");
+        unreachable!("Program's logic contradicts itself! Please, report a bug!");
     }
-    match between_sep_and_do[0] 
 
     // Tasks inside of a for block
     let tasks = match helpful::split_commands(args[position_of_do+1..position_of_end].to_owned(), helpful::SPLIT_COMMANDS.to_vec(), false) {

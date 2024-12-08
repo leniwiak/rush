@@ -119,7 +119,7 @@ fn main() {
             "if" | "elseif" => make_comparison(&mut idx, &all_commands, &mut returns, false),
             "else" => make_comparison(&mut idx, &all_commands, &mut returns, true),
             a => {
-                panic!("Internal error! Logic jumped to unknown super operator: {a}!");
+                unreachable!("Internal error! Logic jumped to unknown super operator: {a}!");
             }
         }
     }

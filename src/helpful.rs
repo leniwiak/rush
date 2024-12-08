@@ -26,7 +26,9 @@ impl ::std::default::Default for RushConfig {
 
 // Commands that separate inline commands.
 pub const SPLIT_COMMANDS:[&str;2] = ["then", "next"];
-// Commands wont be separated by shell by SPLIT_COMMANDS from point where logic operator is found, until "END" is reached.
+// Commands from point where logic operator is found, until "END"
+// wont be separated automatically by shell by words defined in SPLIT_COMMANDS.
+// Also, shell won't expand variable references ($varname syntax) between these words and next 'do'
 pub const LOGIC_OPERATORS:[&str;3] = ["if", "loop", "for"];
 
 //
@@ -754,16 +756,18 @@ pub fn make_comparison(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut
 
     let (shall_we_move_on, task_commands) = if !run_as_else {
         // Position of commands between IF/ELSEIF and DO
-        // Comparison operator and "DO" is not present in case of running as "ELSE"
+        // TIP: Comparison operator and "DO" is not present in case of running as "ELSE"
         let comparison_statement_starting_position = super_operator_index+1;
 
         // Find out where "DO" is located
         // or use fixed value from "end_comparison" when running from the break().
         let do_keyword_position = all_commands[super_operator_index..].iter().position(|x| x[0] == "do").unwrap();
 
-        // Protect from writing "if do", "elseif do" and "else do". "DO" have to be preceeded with something different than just a
-        // super operator if/else or elseif
-        // DO NOT run this test when end_comparison is defined. That means, we are running from
+        // Protect from writing "if do", "elseif do" and "else do".
+        // "DO" has to be preceeded with something different than just a super operator (if/else or elseif)
+        // DO NOT run this test when end_comparison is defined.
+
+        // If this is the case, we are running from
         // break(), so "do" keyword is not present!
         if do_keyword_position == super_operator_index+1 {
             // eprintln!("{super_operator_index} {do_keyword_position}");
@@ -783,25 +787,32 @@ pub fn make_comparison(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut
         };
         // dbg!(&all_commands[do_keyword_position+1]);
 
-        // Run all commands inside comparison statement
+        // Run all NORMAL commands inside comparison statement
+        //dbg!(comparison_statement_commands);
         let mut index = 0;
-        while index < comparison_statement_commands.len() {
-            // Execute all commands and collect their statuses to "returns"
-            if !SPLIT_COMMANDS.contains(&comparison_statement_commands[index][0].as_str()) {
+        while index < comparison_statement_commands.len() && comparison_statement_commands[index][0] != "do" {
+            // Execute all NORMAL commands and collect their statuses to "returns"
+            // println!("COMMAND {:?}", &comparison_statement_commands[index]);
+            if !IF_SPLIT_COMMANDS.contains(&comparison_statement_commands[index][0].as_str()) {
+                // println!("IS BEING RUN. IT HAS INDEX NUMER {}", index+comparison_statement_starting_position);
                 silent_exec(&comparison_statement_commands[index], index+comparison_statement_starting_position, returns);
             }
             index += 1;
         }
 
-        // When exit codes of all commands inside comparison statement are known - try executing AND, OR operators
+
+        // When exit codes of all NORMAL commands inside comparison statement are known
+        // Run AND, OR, NOT operators
+        // dbg!(comparison_statement_commands);
         let mut index = 0;
         while index < comparison_statement_commands.len() && comparison_statement_commands[index][0] != "do" {
+            // println!("COMMAND {:?}", &comparison_statement_commands[index]);
             match comparison_statement_commands[index][0].as_str() {
-                "and" => and(index, returns),
-                "or" => or(index, returns),
-                "not" => not(index, returns),
+                "and" => and(index+comparison_statement_starting_position, returns),
+                "or" => or(index+comparison_statement_starting_position, returns),
+                "not" => not(index+comparison_statement_starting_position, returns),
                 "else" | "elseif" | "end" | "if" => {
-                    eprintln!("SYNTAX ERROR! Operator \"{}\" was found in a comparison statement!", comparison_statement_commands[index][0]);
+                    eprintln!("SYNTAX ERROR! Operator \"{}\" was found in a comparison statement!", comparison_statement_commands[index+comparison_statement_starting_position][0]);
                     process::exit(1);
                 },
                 _ => (),
@@ -868,7 +879,7 @@ pub fn do_the_task(commands: Vec<Vec<String>>) {
     detect_commands(&commands);
 }
 
-// This checks exit code of commands executed before and after.
+// This checks exit code of commands executed before and after a keyword.
 // Then, it returns true ONLY IF BOTH return codes are positive
 pub fn and(index_of_and:usize, returns: &mut HashMap<usize, bool>) {
     if index_of_and == 0 {
