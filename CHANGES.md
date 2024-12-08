@@ -119,6 +119,14 @@ Thanks Rust.
 - CMP: Support for negative numbers
 - GLUE: Ability to join arguments
 
+### Added on 5.12.2024
+
+- UNSET: Remove a variable
+
+### Added on 7.12.2024
+
+- CD: Check current working directory
+
 ### Waiting features:
 
 - MATH: Do the math stuff

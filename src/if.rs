@@ -113,7 +113,8 @@ fn main() {
     let end_position = all_commands.iter().position(|x| x[0] == "end" ).unwrap();
     // dbg!(&all_commands);
     while idx != end_position {
-        // println!("LET'S GO: {idx}!!!");
+        // This binary can be invoked as "if", "elseif" or "else"
+        // Check how it has been run
         match all_commands[idx][0].as_str() {
             "if" | "elseif" => make_comparison(&mut idx, &all_commands, &mut returns, false),
             "else" => make_comparison(&mut idx, &all_commands, &mut returns, true),

@@ -32,6 +32,10 @@ path = "../carrot-libs"
 # NEVER EVER try to add them here!
 
 [[bin]]
+name = "cd"
+path = "src/cd.rs"
+
+[[bin]]
 name = "cmp"
 path = "src/cmp.rs"
 

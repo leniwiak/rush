@@ -144,6 +144,7 @@ pub fn detect_commands(commands:&[Vec<String>]) {
                 "end" | "next" => (),
                 "getenv" | "get" => getenv(&this_command, index, &mut returns),
                 "setenv" | "set" => setenv(&this_command, index, &mut returns),
+                "unsetenv" | "unset" => unsetenv(&this_command, index, &mut returns),
                 "then" => then(&mut index, &mut returns, commands, &mut stop),
                 "exec" => exec(&this_command, index, &mut returns),
                 "panic" => panic!("Manually invoked panic message"),
@@ -602,7 +603,7 @@ pub fn setenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
         report_failure(index, returns);
     }
     else if args.len() == 2 {
-        eprintln!("OPERATOR \"SETENV\" FAILED! Give me the contents to save");
+        eprintln!("OPERATOR \"SETENV\" FAILED! Give me the contents to save!");
         report_failure(index, returns)
     }
     else {
@@ -624,6 +625,40 @@ pub fn setenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
         // trim _end() is going to remove any trailing white characters at the end
         // variable contents so contents will be more clean.
         set_var(&args[1], value.trim_end());
+        report_success(index, returns);
+    }
+}
+
+use std::env::remove_var;
+pub fn unsetenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
+    // Check if there is just ONE argument
+    // We can't check more than one variable at the same time
+    if args.len() == 1 {
+        eprintln!("Give me a variable name to remove!");
+        // As usual, run this function to report a failure.
+        // "index" variable contains position of a command
+        // "returns" contains information about all return codes that were reported by commands
+        // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
+        report_failure(index, returns);
+    }
+    else if args.len() > 2 {
+        eprintln!("Cannot unset multiple variables simultaneously!");
+        report_failure(index, returns)
+    }
+    else {
+        let variable = match var_os(&args[1]) {
+            Some(ret) => ret,
+            None => { 
+                eprintln!("UNSETENV FAILED! Variable \"{}\" is not set!", args[1]);
+                report_failure(index, returns);
+                OsString::new()
+            }
+        };
+        if let Ok(res) = variable.into_string() {
+             if !res.is_empty() {
+                 remove_var(&args[1]);
+             }
+        }
         report_success(index, returns);
     }
 }

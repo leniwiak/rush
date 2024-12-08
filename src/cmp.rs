@@ -20,7 +20,7 @@ FOR TEXT VALUES:
     ~           Contained
     != / =!     Different
 
-When you want to use command's STDOUT of while comparing - use :command
+When you want to use command's STDOUT of while comparing - use OUT:command
 When you want to use command's STDERR of while comparing - use ERR:command
 When you want to use command's exit code while comparing - use CODE:command
 When you want to use the output of a variable while comparing - use $variable
@@ -122,9 +122,9 @@ fn main() {
 }
 
 fn replace_contents(text:String) -> String {
-    if text.starts_with(':') || text.starts_with("ERR:") || text.starts_with("CODE:") {
-        let command = if text.starts_with(':') {
-            text.strip_prefix(':')
+    if text.starts_with("OUT:") || text.starts_with("ERR:") || text.starts_with("CODE:") {
+        let command = if text.starts_with("OUT:") {
+            text.strip_prefix("OUT:")
         } else if text.starts_with("ERR:") {
             text.strip_prefix("ERR:")
         } else if text.starts_with("CODE:") {
@@ -143,7 +143,7 @@ fn replace_contents(text:String) -> String {
         
         let output = getoutput_exec(&ewygerfeue);
         
-        if text.starts_with(':') {
+        if text.starts_with("OUT:") {
             String::from_utf8(output.stdout).unwrap()
         } else if text.starts_with("ERR:") {
             String::from_utf8(output.stderr).unwrap()
