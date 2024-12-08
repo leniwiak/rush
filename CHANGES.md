@@ -134,12 +134,14 @@ Thanks Rust.
 
 # Release 0.4.0:
 
+- SAY: Print text to the terminal (NEW PROGRAM!)
+- NSAY: Print text to the terminal (without new line character at the end) (NEW PROGRAM!)
+- RUSH: Aliases
+- RUSH: History storing
+
 ### Waiting features:
 
-- RUSH: Aliases
-- RUSH: History storing and browsing
-- RANDOM: Generate random numbers
-- SAY: Print text to the terminal
+- RUSH: History browsing
 
 # Release unknown:
 

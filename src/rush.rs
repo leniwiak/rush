@@ -1,22 +1,14 @@
+use std::io::Write;
 use std::process;
-use std::env;
 use carrot_libs::args;
 use carrot_libs::input;
-use serde_derive::{Deserialize, Serialize};
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use std::thread;
+use std::fs::OpenOptions;
+use std::env;
 
 mod helpful;
-
-#[derive(Serialize, Deserialize)]
-struct RushConfig {
-    prompt: String,
-}
-
-/// `MyConfig` implements `Default`
-impl ::std::default::Default for RushConfig {
-    fn default() -> Self { Self { prompt: "> ".into() } }
-}
+use helpful::RushConfig;
 
 fn main() {
     let opts = args::opts();
@@ -68,13 +60,19 @@ fn main() {
 }
 
 fn init_input_mode() {
-    // Always set $? (return code of previous command) to zero on start-up
-    env::set_var("?", "0");
     loop {
-        // Get all space separated words from user
-        let cfg:RushConfig = confy::load("rush", "rush").unwrap();
-        let console_input = match input::get(cfg.prompt, false) {
+        let cfg:RushConfig = match confy::load("rush", "rush") {
+            Err(e) => { eprintln!("Failed to read config file: {}!", e); process::exit(1)},
             Ok(e) => e,
+        };
+
+        // Get all space separated words from user input
+        let console_input = match input::get(cfg.prompt, false) {
+            Ok(e) => {
+                append_to_history(&e);
+                // Return the list of words
+                e
+            },
             Err(e) => {
                 eprintln!("Can't get user input: {e}");
                 process::exit(1);
@@ -87,5 +85,23 @@ fn init_input_mode() {
             Ok(a) => helpful::detect_commands(&a),
             Err(e) => eprintln!("{e}!"),
         }
+    };
+}
+
+fn append_to_history(e:&[String]) {
+    if let Some(home_dir) = env::var_os("HOME") {
+        if let Ok(motherfucking_home_dir) = home_dir.into_string() {
+            let history_file_path = format!("{motherfucking_home_dir}/.rush_history.txt");
+            // Open file (or create if does not exist) in append mode
+            let mut file = OpenOptions::new().append(true).create(true).open(history_file_path);
+            // If opening succeeds, write to the file
+            if let Ok(ret) = &mut file {
+                let mut text = String::new();
+                e.iter().for_each(|x| {text.push_str(x); text.push(' ')} );
+                // We don't care whether it succeeds or not
+                let Ok(_) = writeln!(ret, "{text}") else {return};
+                
+            }
+        };
     };
 }
