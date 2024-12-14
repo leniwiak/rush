@@ -139,6 +139,16 @@ Thanks Rust.
 - RUSH: Aliases
 - RUSH: History storing
 
+# Release 0.5.0:
+
+### Added on 14.12.2024
+
+- Prepare for a massive code rework
+- Rename CD to DIR
+- Drop alias and history support
+- LOCK: Endless loops (NEW!)
+- Theoretical comments support
+
 ### Waiting features:
 
 - RUSH: History browsing

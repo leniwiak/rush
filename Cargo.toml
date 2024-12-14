@@ -1,6 +1,6 @@
 [package]
 name = "rush"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 
 [build]
@@ -28,45 +28,21 @@ num-bigint = "*"
 [dependencies.carrot_libs]
 path = "../carrot-libs"
 
-# Quick note for future me - SETENV and GETENV are NOT MEANT to be binaries!
-# NEVER EVER try to add them here!
-
-[[bin]]
-name = "cd"
-path = "src/cd.rs"
-
-[[bin]]
-name = "cmp"
-path = "src/cmp.rs"
-
-[[bin]]
-name = "for"
-path = "src/for.rs"
-
-[[bin]]
-name = "glue"
-path = "src/glue.rs"
-
-[[bin]]
-name = "if"
-path = "src/if.rs"
-
-[[bin]]
-name = "loop"
-path = "src/loop.rs"
-
-[[bin]]
-name = "nsay"
-path = "src/nsay.rs"
-
 [[bin]]
 name = "rush"
 path = "src/rush.rs"
 
 [[bin]]
-name = "say"
-path = "src/say.rs"
+name = "dir"
+path = "src/dir.rs"
 
 [[bin]]
 name = "sleep"
 path = "src/sleep.rs"
+
+[[bin]]
+name = "say"
+path = "src/say.rs"
+[[bin]]
+name = "nsay"
+path = "src/nsay.rs"
