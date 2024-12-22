@@ -1,6 +1,6 @@
-use crate::global::{index, set_index};
+use std::collections::HashMap;
 
-pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
+pub fn logic(buf: Vec<String>) -> Result<bool, String> {
     /*
     if FAIL:thing1 -with-arg -with-another-arg and OK:thing2 or OUT:thing3 and $variable == 10 do
         say "I'm a bunch of words on your screen"
@@ -72,7 +72,7 @@ pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
         > Check if previous block is of type NUMVAL or TXTVAL
         > At this point, just set if_operation_mode to...
           == and =        EQUAL (acceptable for both types)
-          !=, != and !    DIFFERENT (acceptable for both types)
+          !=, =! and !    DIFFERENT (acceptable for both types)
           <               LESS (only for NUMVALs)
           =< or <=        LESS_OR_EQUAL (only for NUMVALs)
           >               GREATER (only for NUMVALs)
@@ -97,8 +97,68 @@ pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
     11. Iterate through wordlist again
     */
     //let a = index();
-    for w in buf {
-        println!("{w}");
+
+    let mut big_mommy = HashMap::new();
+    for (i, w) in buf.clone().into_iter().enumerate() {
+        if w.starts_with("OK:") {
+            big_mommy.insert("OK:", buf[i].strip_prefix("OK:").unwrap());
+        }
+        else if w.starts_with("FAIL:") {
+            big_mommy.insert("FAIL:", buf[i].strip_prefix("FAIL:").unwrap());
+        }
+        else if w.starts_with("CODE:") {
+            big_mommy.insert("CODE:", buf[i].strip_prefix("CODE:").unwrap());
+        }
+        else if w.starts_with("OUT:") {
+            big_mommy.insert("OUT:", buf[i].strip_prefix("OUT:").unwrap());
+        }
+        else if w.starts_with("ERR:") {
+            big_mommy.insert("ERR:", buf[i].strip_prefix("ERR:").unwrap());
+        }
+        else if w == "AND" {
+            big_mommy.insert("LOGIC:", "AND");
+        }
+        else if w == "OR" {
+            big_mommy.insert("LOGIC:", "OR");
+        }
+        else if w == "DO" {
+            big_mommy.insert("LOGIC:", "DO");
+        }
+        else if w == "==" || w == "=" {
+            big_mommy.insert("COMPARATOR:", "EQUAL");
+        }
+        else if w == "!=" || w == "=!" || w == "!" {
+            big_mommy.insert("COMPARATOR:", "DIFFERENT");
+        }
+        else if w == "<" {
+            big_mommy.insert("COMPARATOR:", "LESS");
+        }
+        else if w == "=<" || w == "<=" {
+            big_mommy.insert("COMPARATOR:", "LESS_OR_EQUAL");
+        }
+        else if w == ">" {
+            big_mommy.insert("COMPARATOR:", "GREATER");
+        }
+        else if w == ">=" || w == "=>" {
+            big_mommy.insert("COMPARATOR:", "GREATER_OR_EQUAL");
+        }
+        else if w == "~~" || w == "~" || w == "~=" || w == "=~" {
+            big_mommy.insert("COMPARATOR:", "CONTAINS");
+        }
+        else if w == "==" || w == "=" {
+            big_mommy.insert("COMPARATOR:", "EQUAL");
+        }
+        else {
+            let is_num = w.parse::<usize>().is_ok();
+            if is_num {
+                //big_mommy.insert("NUMVAL:", &w);
+                todo!();
+            } else {
+                //big_mommy.insert("TXTVAL:", &w);
+                todo!();
+            }
+        }
+
     }
     Ok(true)
 }

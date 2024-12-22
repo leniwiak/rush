@@ -18,8 +18,8 @@ directory = "vendor"
 
 [dependencies]
 libc = "*"
-rand = "0.8.4"
-signal-hook = "*"
+rand = "*"
+ctrlc = "*"
 confy = "*"
 serde = "*"
 serde_derive = "*"
