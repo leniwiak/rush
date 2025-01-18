@@ -139,15 +139,51 @@ Thanks Rust.
 - RUSH: Aliases
 - RUSH: History storing
 
+# Release 0.5.0:
+
+### Added on 14.12.2024
+
+- Prepare for a massive code rework
+- Rename CD to DIR
+- Drop alias and history support (temporarily!)
+- LOCK: Endless loops (NEW!)
+- Theoretical comments support
+
+### Added on 20.12.2024
+
+- Bugfixes to lock
+- Working FREE and CONTINUE keywords inside locks
+- Drop variable names resolution (temporarily!)
+- Use comma to separate commands
+- Use semicolon to end blocks
+
+### Added on 21.12.2024
+
+- Change DEC and INC command names to "--" and "++"
+
+### Added on 22.12.2024
+
+- Bugfixes for nested locks
+
+### Added on 23.12.2024
+
+- Interrupts (SIGINT from CTRL+C) are working as they should (probably)
+
+# Release 0.5.1:
+
+### Added on 23.12.2024
+
+
+
 ### Waiting features:
 
-- RUSH: History browsing
+- Syntax checker
+- History browsing on CLI
+- Variable names resolution
 
 # Release unknown:
 
 - RUSH: Restricted shell mode
-- RUSH: Run files (scripts) passed as arguments from CLI
-- RUSH: Comments
 - RUSH: Functions
 - RUSH: Pipes
 - RUSH: Ability to redirect command's output to a file

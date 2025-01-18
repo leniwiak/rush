@@ -4,9 +4,6 @@ use std::collections::HashMap;
 use std::env;
 use std::process;
 use std::process::Stdio;
-use std::io;
-use std::io::Write;
-use carrot_libs::system;
 use num_bigint::BigInt;
 
 #[derive(Serialize, Deserialize)]
@@ -26,7 +23,9 @@ impl ::std::default::Default for RushConfig {
 
 // Commands that separate inline commands.
 pub const SPLIT_COMMANDS:[&str;2] = ["then", "next"];
-// Commands wont be separated by shell by SPLIT_COMMANDS from point where logic operator is found, until "END" is reached.
+// Commands from point where logic operator is found, until "END"
+// wont be separated automatically by shell by words defined in SPLIT_COMMANDS.
+// Also, shell won't expand variable references ($varname syntax) between these words and next 'do'
 pub const LOGIC_OPERATORS:[&str;3] = ["if", "loop", "for"];
 
 //
@@ -131,7 +130,7 @@ pub fn detect_commands(commands:&[Vec<String>]) {
                     parsed_variable-=1;
                 }
                 // Save new variable contents to environment
-                set_var(modified_word, parsed_variable.to_string());
+                //set_var(modified_word, parsed_variable.to_string());
                 // Remove current word from a command
                 this_command.remove(i);
                 // Append contents of a variable to a command
@@ -153,20 +152,19 @@ pub fn detect_commands(commands:&[Vec<String>]) {
         // Check whether the first argument is a keyword or not
         if !stop {
             match this_command[0].as_str() {
-                "gt" => gt(&this_command, index, &mut returns),
                 // "help" | "?" => help(),
                 "exit" | "quit" | "bye" => exit(&this_command, index, &mut returns),
                 "break" => r#break(&this_command, index, &mut returns),
                 "end" | "next" => (),
                 "alias" => alias(&this_command, index, &mut returns),
-                "getenv" | "get" => getenv(&this_command, index, &mut returns),
-                "setenv" | "set" => setenv(&this_command, index, &mut returns),
-                "unsetenv" | "unset" => unsetenv(&this_command, index, &mut returns),
+                //"getenv" | "get" => getenv(&this_command, index, &mut returns),
+                //"setenv" | "set" => setenv(&this_command, index, &mut returns),
+                //"unsetenv" | "unset" => unsetenv(&this_command, index, &mut returns),
                 "then" => then(&mut index, &mut returns, commands, &mut stop),
-                "exec" => exec(&this_command, index, &mut returns),
+                //"exec" => exec(&this_command, index, &mut returns),
                 "panic" => panic!("Manually invoked panic message"),
                 
-                _ => exec(&this_command, index, &mut returns)
+                _ => todo!()
             };
             if index < commands.len() {
                 index+=1;
@@ -176,35 +174,6 @@ pub fn detect_commands(commands:&[Vec<String>]) {
             return;
         };
     }
-}
-
-// Change working directory
-pub fn gt(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
-    // Check if there is just ONE argument
-    // We can't go to more than one directory at the same time
-    if args.len() == 1 {
-        eprintln!("Give me a directory path to go!");
-        // As usual, run this function to report a failure.
-        // "index" variable contains position of a command
-        // "returns" contains information about all return codes that were reported by commands
-        // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
-        report_failure(index, returns);
-    }
-    else if args.len() > 2 {
-        eprintln!("Cannot go to multiple directories simultaneously!");
-        report_failure(index, returns)
-    }
-    else {
-        match env::set_current_dir(&args[1]) { 
-            Err(e) => {
-                eprintln!("{}: Cannot go into this directory because of an error: {}", args[1], e.kind());
-                report_failure(index, returns);
-            },
-            Ok(_) => {
-                report_success(index, returns);
-            }
-        };
-    };
 }
 
 // Just go away with specified exit code
@@ -556,53 +525,6 @@ pub fn strip_quotes(input:&str) -> Option<String> {
     }
 }
 
-// This will be used to execute commands!
-pub fn exec(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
-    // Do nothing if nothing was requested
-    // This might occur when the user presses ENTER without even typing anything
-    if args.is_empty() || args[0].is_empty() {
-        print!("");
-    }
-
-    // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and get it's status
-    // using process::Command::new().args().status();
-    match process::Command::new(&args[0]).args(&args[1..]).status() { 
-        Err(e) => {
-            eprintln!("{}: Command execution failed: {:?}", args[0], e.kind());
-            report_failure(index, returns)
-        },
-        Ok(process) => {
-            // If the command is possible to run, save it's status to "returns" variable
-            let command_status = process.success();
-            returns.insert(index, command_status);
-        },
-    }
-    // Flush stdout
-    io::stdout().flush().unwrap();
-}
-
-// This will be used to execute commands and get it's contents!
-pub fn getoutput_exec(args:&[String]) -> process::Output {
-    // Do nothing if nothing was requested
-    // This might occur when the user presses ENTER without even typing anything
-    if args.is_empty() || args[0].is_empty() {
-        print!("");
-    }
-    
-    // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and get it's status
-    // using process::Command::new().args().status();
-    match process::Command::new(&args[0]).args(&args[1..]).output() { 
-        Err(e) => {
-            eprintln!("{}: Command execution failed: {:?}", args[0], e.kind());
-            process::exit(1);
-        },
-        Ok(process) => {
-            // If the command is possible to run, save it's status to "returns" variable
-            process
-        },
-    }
-}
-
 pub fn silent_exec(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
     // Run a command passed in "args[0]" with arguments in "args[1]" (and so on) and collect it's status to "returns"
     match process::Command::new(&args[0]).args(&args[1..]).stdout(Stdio::null()).status() { 
@@ -618,121 +540,6 @@ pub fn silent_exec(args:&[String], index:usize, returns:&mut HashMap<usize, bool
     }
 }
 
-use std::env::var_os;
-use std::ffi::OsString;
-pub fn getenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
-    // Check if there is just ONE argument
-    // We can't check more than one variable at the same time
-    if args.len() == 1 {
-        eprintln!("Give me a variable name to check!");
-        // As usual, run this function to report a failure.
-        // "index" variable contains position of a command
-        // "returns" contains information about all return codes that were reported by commands
-        // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
-        report_failure(index, returns);
-    }
-    else if args.len() > 2 {
-        eprintln!("Cannot check multiple variables simultaneously!");
-        report_failure(index, returns)
-    }
-    else {
-        let variable = match var_os(&args[1]) {
-            Some(ret) => ret,
-            None => { 
-                eprintln!("GETENV FAILED! Variable \"{}\" is not set!", args[1]);
-                report_failure(index, returns);
-                OsString::new()
-            }
-        };
-        if let Ok(res) = variable.into_string() {
-             if !res.is_empty() {
-                // If a variable is an array, separate it and show every item on a new line
-                if res.contains(':') {
-                    let res = res.split(':');
-                    for bruhitto in res {
-                        println!("{}", bruhitto);
-                    }
-                }
-                else {
-                    println!("{}", res);
-                }
-             }
-        }
-        report_success(index, returns);
-    }
-}
-
-use std::env::set_var;
-pub fn setenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
-    // Check if there is just ONE argument
-    // We can't set more than one variable at the same time
-    if args.len() == 1 {
-        eprintln!("Give me a variable name to set!");
-        // As usual, run this function to report a failure.
-        // "index" variable contains position of a command
-        // "returns" contains information about all return codes that were reported by commands
-        // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
-        report_failure(index, returns);
-    }
-    else if args.len() == 2 {
-        eprintln!("OPERATOR \"SETENV\" FAILED! Give me the contents to save!");
-        report_failure(index, returns)
-    }
-    else {
-        // Allow user to set variables with proper letters only
-        if system::check_simple_characters_compliance(&args[1]).is_err() {
-            eprintln!("OPEATOR \"SETENV\" FAILED! Variable name contains invalid characters: {}!", args[1]);
-            report_failure(index, returns);
-        }
-        if args[1].is_empty() || args[2..].is_empty() {
-            eprintln!("OPEATOR \"SETENV\" FAILED! Variable name or it's value is empty!");
-            report_failure(index, returns);
-        }
-        // Value must contain contents of arg 2+
-        let mut value = String::new();
-        for a in &args[2..] {
-            value.push_str(&format!("{} ", a));
-        };
-
-        // trim _end() is going to remove any trailing white characters at the end
-        set_var(&args[1], value.trim_end());
-        report_success(index, returns);
-    }
-}
-
-use std::env::remove_var;
-pub fn unsetenv(args:&[String], index:usize, returns:&mut HashMap<usize, bool>) {
-    // Check if there is just ONE argument
-    // We can't check more than one variable at the same time
-    if args.len() == 1 {
-        eprintln!("Give me a variable name to remove!");
-        // As usual, run this function to report a failure.
-        // "index" variable contains position of a command
-        // "returns" contains information about all return codes that were reported by commands
-        // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
-        report_failure(index, returns);
-    }
-    else if args.len() > 2 {
-        eprintln!("Cannot unset multiple variables simultaneously!");
-        report_failure(index, returns)
-    }
-    else {
-        let variable = match var_os(&args[1]) {
-            Some(ret) => ret,
-            None => { 
-                eprintln!("UNSETENV FAILED! Variable \"{}\" is not set!", args[1]);
-                report_failure(index, returns);
-                OsString::new()
-            }
-        };
-        if let Ok(res) = variable.into_string() {
-             if !res.is_empty() {
-                 remove_var(&args[1]);
-             }
-        }
-        report_success(index, returns);
-    }
-}
 
 /*
 Place where we invoke super commands
@@ -754,16 +561,18 @@ pub fn make_comparison(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut
 
     let (shall_we_move_on, task_commands) = if !run_as_else {
         // Position of commands between IF/ELSEIF and DO
-        // Comparison operator and "DO" is not present in case of running as "ELSE"
+        // TIP: Comparison operator and "DO" is not present in case of running as "ELSE"
         let comparison_statement_starting_position = super_operator_index+1;
 
         // Find out where "DO" is located
         // or use fixed value from "end_comparison" when running from the break().
         let do_keyword_position = all_commands[super_operator_index..].iter().position(|x| x[0] == "do").unwrap();
 
-        // Protect from writing "if do", "elseif do" and "else do". "DO" have to be preceeded with something different than just a
-        // super operator if/else or elseif
-        // DO NOT run this test when end_comparison is defined. That means, we are running from
+        // Protect from writing "if do", "elseif do" and "else do".
+        // "DO" has to be preceeded with something different than just a super operator (if/else or elseif)
+        // DO NOT run this test when end_comparison is defined.
+
+        // If this is the case, we are running from
         // break(), so "do" keyword is not present!
         if do_keyword_position == super_operator_index+1 {
             // eprintln!("{super_operator_index} {do_keyword_position}");
@@ -783,25 +592,32 @@ pub fn make_comparison(idx:&mut usize, all_commands:&[Vec<String>], returns:&mut
         };
         // dbg!(&all_commands[do_keyword_position+1]);
 
-        // Run all commands inside comparison statement
+        // Run all NORMAL commands inside comparison statement
+        //dbg!(comparison_statement_commands);
         let mut index = 0;
-        while index < comparison_statement_commands.len() {
-            // Execute all commands and collect their statuses to "returns"
-            if !SPLIT_COMMANDS.contains(&comparison_statement_commands[index][0].as_str()) {
+        while index < comparison_statement_commands.len() && comparison_statement_commands[index][0] != "do" {
+            // Execute all NORMAL commands and collect their statuses to "returns"
+            // println!("COMMAND {:?}", &comparison_statement_commands[index]);
+            if !IF_SPLIT_COMMANDS.contains(&comparison_statement_commands[index][0].as_str()) {
+                // println!("IS BEING RUN. IT HAS INDEX NUMER {}", index+comparison_statement_starting_position);
                 silent_exec(&comparison_statement_commands[index], index+comparison_statement_starting_position, returns);
             }
             index += 1;
         }
 
-        // When exit codes of all commands inside comparison statement are known - try executing AND, OR operators
+
+        // When exit codes of all NORMAL commands inside comparison statement are known
+        // Run AND, OR, NOT operators
+        // dbg!(comparison_statement_commands);
         let mut index = 0;
         while index < comparison_statement_commands.len() && comparison_statement_commands[index][0] != "do" {
+            // println!("COMMAND {:?}", &comparison_statement_commands[index]);
             match comparison_statement_commands[index][0].as_str() {
-                "and" => and(index, returns),
-                "or" => or(index, returns),
-                "not" => not(index, returns),
+                "and" => and(index+comparison_statement_starting_position, returns),
+                "or" => or(index+comparison_statement_starting_position, returns),
+                "not" => not(index+comparison_statement_starting_position, returns),
                 "else" | "elseif" | "end" | "if" => {
-                    eprintln!("SYNTAX ERROR! Operator \"{}\" was found in a comparison statement!", comparison_statement_commands[index][0]);
+                    eprintln!("SYNTAX ERROR! Operator \"{}\" was found in a comparison statement!", comparison_statement_commands[index+comparison_statement_starting_position][0]);
                     process::exit(1);
                 },
                 _ => (),
@@ -868,7 +684,7 @@ pub fn do_the_task(commands: Vec<Vec<String>>) {
     detect_commands(&commands);
 }
 
-// This checks exit code of commands executed before and after.
+// This checks exit code of commands executed before and after a keyword.
 // Then, it returns true ONLY IF BOTH return codes are positive
 pub fn and(index_of_and:usize, returns: &mut HashMap<usize, bool>) {
     if index_of_and == 0 {

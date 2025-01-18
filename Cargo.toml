@@ -1,6 +1,6 @@
 [package]
 name = "rush"
-version = "0.4.0"
+version = "0.5.1"
 edition = "2021"
 
 [build]
@@ -18,8 +18,8 @@ directory = "vendor"
 
 [dependencies]
 libc = "*"
-rand = "0.8.4"
-signal-hook = "*"
+rand = "*"
+ctrlc = "*"
 confy = "*"
 serde = "*"
 serde_derive = "*"
@@ -29,37 +29,20 @@ num-bigint = "*"
 path = "../carrot-libs"
 
 [[bin]]
-name = "cmp"
-path = "src/cmp.rs"
-
-[[bin]]
-name = "for"
-path = "src/for.rs"
-
-[[bin]]
-name = "glue"
-path = "src/glue.rs"
-
-[[bin]]
-name = "if"
-path = "src/if.rs"
-
-[[bin]]
-name = "loop"
-path = "src/loop.rs"
-
-[[bin]]
-name = "nsay"
-path = "src/nsay.rs"
-
-[[bin]]
 name = "rush"
 path = "src/rush.rs"
 
 [[bin]]
-name = "say"
-path = "src/say.rs"
+name = "dir"
+path = "src/dir.rs"
 
 [[bin]]
 name = "sleep"
 path = "src/sleep.rs"
+
+[[bin]]
+name = "say"
+path = "src/say.rs"
+[[bin]]
+name = "nsay"
+path = "src/nsay.rs"
