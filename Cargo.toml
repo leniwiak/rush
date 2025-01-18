@@ -28,13 +28,6 @@ num-bigint = "*"
 [dependencies.carrot_libs]
 path = "../carrot-libs"
 
-# Quick note for future me - SETENV and GETENV are NOT MEANT to be binaries!
-# NEVER EVER try to add them here!
-
-[[bin]]
-name = "cd"
-path = "src/cd.rs"
-
 [[bin]]
 name = "cmp"
 path = "src/cmp.rs"
