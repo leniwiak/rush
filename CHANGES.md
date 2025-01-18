@@ -169,16 +169,21 @@ Thanks Rust.
 
 - Interrupts (SIGINT from CTRL+C) are working as they should (probably)
 
+# Release 0.5.1:
+
+### Added on 23.12.2024
+
+
+
 ### Waiting features:
 
 - Syntax checker
-- RUSH: History browsing
+- History browsing on CLI
+- Variable names resolution
 
 # Release unknown:
 
 - RUSH: Restricted shell mode
-- RUSH: Run files (scripts) passed as arguments from CLI
-- RUSH: Comments
 - RUSH: Functions
 - RUSH: Pipes
 - RUSH: Ability to redirect command's output to a file

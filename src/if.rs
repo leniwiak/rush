@@ -145,9 +145,6 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
         else if w == "~~" || w == "~" || w == "~=" || w == "=~" {
             big_mommy.insert("COMPARATOR:", "CONTAINS");
         }
-        else if w == "==" || w == "=" {
-            big_mommy.insert("COMPARATOR:", "EQUAL");
-        }
         else {
             let is_num = w.parse::<usize>().is_ok();
             if is_num {

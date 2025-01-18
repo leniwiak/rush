@@ -1,5 +1,4 @@
 use std::{io, process};
-use io::stdout;
 use io::Write;
 
 pub fn exec(args:&[String]) -> Result<Option<i32>, String> {

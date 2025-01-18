@@ -3,8 +3,6 @@ use carrot_libs::args;
 use carrot_libs::input;
 use std::thread;
 use std::fs;
-use std::sync::atomic::Ordering;
-use ctrlc;
 mod global;
 mod helpful;
 mod directories;
@@ -84,7 +82,7 @@ fn main() {
             };
             match input::get(cfg.prompt, false) {
                 Ok(e) => {
-                    execute_script(Some(e));
+                    normalize_input(Some(e));
                 },
                 Err(e) => {
                     eprintln!("Can't get user input: {e}");
@@ -100,7 +98,7 @@ fn main() {
             set_allow_interrupts(true);
             set_interrupt_now(false);
             match fs::read_to_string(o) {
-                Ok(e) => execute_script(Some(e.split_whitespace().map(str::to_string).collect())),
+                Ok(e) => normalize_input(Some(e.split_whitespace().map(str::to_string).collect())),
                 Err(e) => {
                     eprintln!("Unable to read from script file: {:?}", e.kind());
                     process::exit(1);
@@ -108,6 +106,96 @@ fn main() {
             }
         }
     };
+}
+
+/* 
+This function joins separate arguments enclosed in quotes and double quotes.
+For example:
+- "this would be tolerated as one argument"
+- 'this is a big argument, too'
+- th"is is also just o"ne
+- "this is incorrect'
+- this won't be accepted either
+- that\'s good
+- this sentence represents multiple arguments. no quotes!
+*/
+#[derive(Debug)]
+enum NormalizationMode {
+    Default,
+    Quote(char),
+}
+fn normalize_input(script: Option<Vec<String>>) {
+    if let Some(script) = script {
+        // Collect words from the script here
+        let mut buf = Vec::new();
+        // Append characters from script words to this string
+        let mut word = String::new();
+
+        let mut normalization_mode = NormalizationMode::Default;
+
+        // Slowly iterate through the characters in each word in a script
+        let mut word_idx = 0;
+
+        while word_idx < script.len() {
+             word.clear();
+
+            let w = &script[word_idx];
+            
+            for c in w.char_indices() {
+                let c_index = c.0;
+                let c = c.1;
+                
+                let word_ends = c_index == w.char_indices().count()-1;
+                
+                match normalization_mode {
+                    // Append letters to a "word" variable, until you reach the end of a word.
+                    // If you reach it, just add entire collected word to a buffer.
+                    // Do it only when normalization mode is set to default.
+                    NormalizationMode::Default => {
+                        // Did you find a quote?
+                        // Check if it is preceeded by a slash, and if not - switch to Quote or DoubleQuote mode.
+                        let prev_char = if word.is_empty() {' '} else {word.chars().nth(c_index.saturating_sub(1)).unwrap()};
+
+                        if (c == '"' || c == '\'') && prev_char != '\\' {
+                            match c {
+                                '\'' | '"' => normalization_mode=NormalizationMode::Quote(c),
+                                _ => unreachable!("Program's logic contradics itself! Please, report an error!"),
+                            }
+                        }
+                        else {
+                            word.push(c);
+                        }
+                        
+                        // Add it to buf on end of a word
+                        if word_ends {
+                            buf.push(word.clone());
+                        }
+                    }
+
+                    NormalizationMode::Quote(kind_of_quote) => {
+                        // Did you find a quote?
+                        // Check if it is preceeded by a slash, and if not - switch back to the Default mode.
+                        let prev_char = if word.is_empty() {' '} else {word.chars().nth(c_index.saturating_sub(2)).unwrap()};
+                        if c == kind_of_quote && prev_char != '\\' {
+                            dbg!(kind_of_quote);
+                            normalization_mode=NormalizationMode::Default;
+                            if w.ends_with(kind_of_quote) {
+                                buf.push(word.clone());
+                            }
+                        }
+                        // Just add letters to 'word'
+                        else {
+                            println!("Dodaję '{}' do słowa '{}'",c, word);
+                            word.push(c);
+                        }
+                    }
+                }
+            }
+            word_idx += 1;
+        }
+        dbg!(buf);
+    }
+    
 }
 
 fn execute_script(script: Option<Vec<String>>) {
@@ -192,6 +280,7 @@ fn parse_script(script: Option<Vec<String>>) {
              */
 
             // If we reach the end of a script OR some command separator like '\n' or, ';'...
+            println!("{:?}", w);
             if the_last_word_in_script
             || (!w.ends_with("\\,") && w.ends_with(','))
             || (!w.ends_with("\\;") && w.ends_with(';')) || w.ends_with('\n')
@@ -210,14 +299,8 @@ fn parse_script(script: Option<Vec<String>>) {
                 Any shell_mode[] is set to LockContinue/LockFree
                 The LAST shell_mode is set to CmpFailure
                 */
-                let contains_lock_continue = shell_mode.iter().any(|s| match s {
-                    ShellModes::LockContinue (_) => true,
-                    _ => false
-                });
-                let contains_lock_free = shell_mode.iter().any(|s| match s {
-                    ShellModes::LockFree => true,
-                    _ => false
-                });
+                let contains_lock_continue = shell_mode.iter().any(|s| matches!(s, ShellModes::LockContinue (_)));
+                let contains_lock_free = shell_mode.iter().any(|s| matches!(s, ShellModes::LockFree));
                 let ends_with_cmp_failure = !shell_mode.is_empty() && matches!(shell_mode[&shell_mode.len()-1], ShellModes::CmpFailure);
                 
                 let ultimate_end_lock = contains_lock_continue || contains_lock_free || ends_with_cmp_failure;
@@ -367,6 +450,10 @@ fn parse_script(script: Option<Vec<String>>) {
                                 print_err(e, program_name, line_number);
                             };
                         },
+
+                        "panic" => {
+                            panic!("User invoked panic");
+                        }
     
                         // Comments will never be run
                         "#" | "end" => {},
