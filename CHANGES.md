@@ -171,8 +171,9 @@ Thanks Rust.
 
 # Release 0.5.1:
 
-### Added on 23.12.2024
+### Added on 19.01.2025
 
+- Group words inside quotationmarks
 
 
 ### Waiting features:

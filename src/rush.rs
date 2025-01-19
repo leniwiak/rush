@@ -109,7 +109,7 @@ fn main() {
 }
 
 /* 
-This function joins separate arguments enclosed in quotes and double quotes.
+This function joins separate arguments enclosed in single or double quotationmarks.
 For example:
 - "this would be tolerated as one argument"
 - 'this is a big argument, too'
@@ -117,82 +117,54 @@ For example:
 - "this is incorrect'
 - this won't be accepted either
 - that\'s good
-- this sentence represents multiple arguments. no quotes!
+- this sentence represents multiple arguments. no quotationmarks!
 */
 #[derive(Debug)]
 enum NormalizationMode {
     Default,
-    Quote(char),
+    Qmark(char, usize),
 }
 fn normalize_input(script: Option<Vec<String>>) {
     if let Some(script) = script {
-        // Collect words from the script here
+        // Collect non-quoted and joined quoted commands from the script here
         let mut buf = Vec::new();
-        // Append characters from script words to this string
-        let mut word = String::new();
+        let mut words_in_qmarks = String::new();
 
-        let mut normalization_mode = NormalizationMode::Default;
+        let mut single_qmarks = false;
+        let mut double_qmarks = false;
 
-        // Slowly iterate through the characters in each word in a script
-        let mut word_idx = 0;
+        for w in script {
+            // Iterate through all the letters to find quotationmarks
+            for (c_idx, c) in w.chars().enumerate() {
+                // Toggle single/double_qmark variable if we find a quotationmark that is not
+                // enclosed in other quotationmark AND is not preceded by a slash.
+                if c == '\'' && (c_idx == 0 || w.chars().nth(c_idx-1).unwrap() != '\\') && !double_qmarks {
+                    single_qmarks = !single_qmarks;
+                }
 
-        while word_idx < script.len() {
-             word.clear();
-
-            let w = &script[word_idx];
-            
-            for c in w.char_indices() {
-                let c_index = c.0;
-                let c = c.1;
-                
-                let word_ends = c_index == w.char_indices().count()-1;
-                
-                match normalization_mode {
-                    // Append letters to a "word" variable, until you reach the end of a word.
-                    // If you reach it, just add entire collected word to a buffer.
-                    // Do it only when normalization mode is set to default.
-                    NormalizationMode::Default => {
-                        // Did you find a quote?
-                        // Check if it is preceeded by a slash, and if not - switch to Quote or DoubleQuote mode.
-                        let prev_char = if word.is_empty() {' '} else {word.chars().nth(c_index.saturating_sub(1)).unwrap()};
-
-                        if (c == '"' || c == '\'') && prev_char != '\\' {
-                            match c {
-                                '\'' | '"' => normalization_mode=NormalizationMode::Quote(c),
-                                _ => unreachable!("Program's logic contradics itself! Please, report an error!"),
-                            }
-                        }
-                        else {
-                            word.push(c);
-                        }
-                        
-                        // Add it to buf on end of a word
-                        if word_ends {
-                            buf.push(word.clone());
-                        }
-                    }
-
-                    NormalizationMode::Quote(kind_of_quote) => {
-                        // Did you find a quote?
-                        // Check if it is preceeded by a slash, and if not - switch back to the Default mode.
-                        let prev_char = if word.is_empty() {' '} else {word.chars().nth(c_index.saturating_sub(2)).unwrap()};
-                        if c == kind_of_quote && prev_char != '\\' {
-                            dbg!(kind_of_quote);
-                            normalization_mode=NormalizationMode::Default;
-                            if w.ends_with(kind_of_quote) {
-                                buf.push(word.clone());
-                            }
-                        }
-                        // Just add letters to 'word'
-                        else {
-                            println!("Dodaję '{}' do słowa '{}'",c, word);
-                            word.push(c);
-                        }
-                    }
+                if c == '"' && (c_idx == 0 || w.chars().nth(c_idx-1).unwrap() != '\\') && !single_qmarks {
+                    double_qmarks = !double_qmarks;
                 }
             }
-            word_idx += 1;
+            if single_qmarks || double_qmarks {
+                if !words_in_qmarks.is_empty() {
+                    words_in_qmarks.push(' ');
+                };
+                words_in_qmarks.push_str(&w);
+            }
+            else {
+                if !words_in_qmarks.is_empty() {
+                    words_in_qmarks.push(' ');
+                    words_in_qmarks.push_str(&w);
+                    buf.push(words_in_qmarks.clone());
+                    words_in_qmarks.clear();
+                }
+                else {
+                    buf.push(w);
+                }
+            }
         }
+
         dbg!(buf);
     }
     
