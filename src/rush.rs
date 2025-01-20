@@ -110,6 +110,12 @@ fn main() {
 
 fn do_rest_of_magic_or_nothing(script: Option<Vec<String>>) {
     if let Some(script) = script {
+        // Do nothing if script is empty
+        if script.is_empty() {
+            print!("");
+            return;
+        }
+        
         group_quotationmarks(script);
     } else {
         print!("");
@@ -155,16 +161,14 @@ fn group_quotationmarks(script: Vec<String>) {
             };
             words_in_qmarks.push_str(&w);
         }
-        else {
-            if !words_in_qmarks.is_empty() {
+        else if !words_in_qmarks.is_empty() {
                 words_in_qmarks.push(' ');
                 words_in_qmarks.push_str(&w);
                 buf.push(words_in_qmarks.clone());
                 words_in_qmarks.clear();
-            }
-            else {
-                buf.push(w.clone());
-            }
+        }
+        else {
+            buf.push(w.clone());
         }
     }
 
@@ -193,10 +197,73 @@ fn remove_quotationmarks(script: Vec<String>) {
         str.clear();
     }
 
-    execute_script(out);
+    syntax_test(out);
 }
 
-fn execute_script(script: Vec<String>) {
+enum Builtins {
+    Lock(usize), If(usize)
+}
+fn syntax_test(script: Vec<String>) {
+    let mut line_number = 1;
+    let mut used_builtins_history = Vec::new();
+    let mut trying_to_run_empty_cmd = Vec::new();
+
+    for w in &script {
+        if w.ends_with('\n') { line_number += 1 };
+        
+        if w == "lock" {used_builtins_history.push(Builtins::Lock(line_number))};
+        if (w == "free" || w == "continue") && !used_builtins_history.iter().any( |x| matches!(x, Builtins::Lock(_)) ) {
+            let e = "Usage of \"FREE\" or \"CONTINUE\" is not permited outside of the \"LOCK\" statement.".to_string();
+            print_err(e, "Rush".to_string(), line_number);
+            return;
+        };
+        
+        if w == "if" {used_builtins_history.push(Builtins::If(line_number))};
+
+        if w == ";" || w.ends_with(';') {
+            used_builtins_history.pop();
+        }
+
+        // TODO
+        if false {
+            trying_to_run_empty_cmd.push(line_number);
+        }
+    }
+
+    // SUMMARY
+    let mut problem_occured = false;
+
+    if !used_builtins_history.is_empty() {
+        problem_occured = true;
+
+        eprintln!("There are errors in your script that need to be fixed or they can cause serious issues!");
+        
+        for element in used_builtins_history {
+            match element {
+                Builtins::Lock(a) => {
+                    eprintln!("\t{a}: Unclosed \"LOCK\" statement");
+                },
+                Builtins::If(a) => {
+                    eprintln!("\t{a}: Unclosed \"IF\" statement");
+                },
+            }
+        }
+    }
+
+    if !trying_to_run_empty_cmd.is_empty() {
+        for a in trying_to_run_empty_cmd {
+            eprintln!("\t{a}: Trying to run empty command");
+        }
+    }
+    
+    if problem_occured {
+        return;
+    }
+
+    make_script_thread(script);
+}
+
+fn make_script_thread(script: Vec<String>) {
     // Allow responses for SIGINT
     set_allow_interrupts(true);
 
@@ -204,7 +271,7 @@ fn execute_script(script: Vec<String>) {
     (
         move ||
         {
-            parse_script(script);
+            run_script(script);
         }
     );
     if let Err(e) = parser.join() {
@@ -213,13 +280,7 @@ fn execute_script(script: Vec<String>) {
     set_allow_interrupts(false);
 }
 
-fn parse_script(script: Vec<String>) {  
-    // Do nothing if script is empty
-    if script.is_empty() {
-        print!("");
-        return;
-    }
-
+fn run_script(script: Vec<String>) {  
     // Iterate through words in the script and slowly collect them to a buffer
     let mut buf: Vec<String> = Vec::new();
     // Count line numbers in the script for better error messages

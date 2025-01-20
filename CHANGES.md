@@ -177,12 +177,15 @@ Thanks Rust.
 
 ### Added on 20.01.2025
 
-- Remove unescaped quotemarks
+- Support for unescaped quotemarks
 - With support for quotes, I can now add commit comments on git!
+- Remove unneeded code
+- Add very barebone syntax checker
 
 ### Waiting features:
 
-- Syntax checker
+- Implement IF logic
+- Disallow running empty commands like this: say hello, , say bye
 - History browsing on CLI
 - Variable names resolution
 
