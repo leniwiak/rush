@@ -175,6 +175,10 @@ Thanks Rust.
 
 - Group words inside quotationmarks
 
+### Added on 20.01.2025
+
+- Remove unescaped quotemarks
+- With support for quotes, I can now add commit comments on git!
 
 ### Waiting features:
 
