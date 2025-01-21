@@ -182,10 +182,12 @@ Thanks Rust.
 - Remove unneeded code
 - Add very barebone syntax checker
 
+### Added on 21.01.2025
+- Disallow running empty commands like this: say hello, , say bye
+
 ### Waiting features:
 
 - Implement IF logic
-- Disallow running empty commands like this: say hello, , say bye
 - History browsing on CLI
 - Variable names resolution
 

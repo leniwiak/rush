@@ -206,57 +206,57 @@ enum Builtins {
 fn syntax_test(script: Vec<String>) {
     let mut line_number = 1;
     let mut used_builtins_history = Vec::new();
-    let mut trying_to_run_empty_cmd = Vec::new();
 
+    // Build list of errors to show
+    let mut errors = Vec::new();
+
+    // Iterate through every word in script and catch some common errors
     for w in &script {
+
+        // Errors messages that tell the user where problematic code is, are much more readable c;
         if w.ends_with('\n') { line_number += 1 };
         
+        // Catch usage of logical statements
         if w == "lock" {used_builtins_history.push(Builtins::Lock(line_number))};
-        if (w == "free" || w == "continue") && !used_builtins_history.iter().any( |x| matches!(x, Builtins::Lock(_)) ) {
-            let e = "Usage of \"FREE\" or \"CONTINUE\" is not permited outside of the \"LOCK\" statement.".to_string();
-            print_err(e, "Rush".to_string(), line_number);
-            return;
-        };
-        
         if w == "if" {used_builtins_history.push(Builtins::If(line_number))};
-
-        if w == ";" || w.ends_with(';') {
+        
+        // Any logical statement have to be ended with ';'
+        // If you find it somewhere, remove the last logical statement from history
+        if !w.ends_with("\\;") && w.ends_with(';') {
             used_builtins_history.pop();
         }
 
-        // TODO
-        if false {
-            trying_to_run_empty_cmd.push(line_number);
+        // Catch use of free or continue
+        if (w == "free" || w == "continue") && !used_builtins_history.iter().any( |x| matches!(x, Builtins::Lock(_)) ) {
+            errors.push(format!("{line_number}: Usage of \"FREE\" or \"CONTINUE\" is not permited outside of the \"LOCK\" statement"));
+        }
+        
+        // Disallow running empty commands like this: say hello, , say bye
+        if w == "," || w == ";"  {
+            errors.push(format!("{line_number}: Trying to run empty command!"))
         }
     }
 
-    // SUMMARY
-    let mut problem_occured = false;
-
+    // Summarize looking for unclosed logical statements
     if !used_builtins_history.is_empty() {
-        problem_occured = true;
-
-        eprintln!("There are errors in your script that need to be fixed or they can cause serious issues!");
-        
         for element in used_builtins_history {
             match element {
                 Builtins::Lock(a) => {
-                    eprintln!("\t{a}: Unclosed \"LOCK\" statement");
+                    errors.push(format!("{a}: Unclosed \"LOCK\" statement"))
                 },
                 Builtins::If(a) => {
-                    eprintln!("\t{a}: Unclosed \"IF\" statement");
+                    errors.push(format!("{a}: Unclosed \"IF\" statement"))
                 },
             }
         }
     }
-
-    if !trying_to_run_empty_cmd.is_empty() {
-        for a in trying_to_run_empty_cmd {
-            eprintln!("\t{a}: Trying to run empty command");
-        }
-    }
     
-    if problem_occured {
+    // Show errors
+    if !errors.is_empty() {
+        eprintln!("There are errors in your script that need to be fixed or they can cause serious issues!");
+        for e in errors {
+            eprintln!("\t{e}");
+        }
         return;
     }
 
@@ -549,7 +549,7 @@ fn run_script(script: Vec<String>) {
         }
 
         // Bump line number if we find a new line character
-        if w.ends_with('\n') {
+        if w.ends_with('\n') && !w.ends_with("\\n") {
             line_number+=1;
         }
 
