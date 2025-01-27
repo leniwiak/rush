@@ -1,7 +1,8 @@
 [package]
 name = "rush"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
+default-run = "rush"
 
 [build]
 rustflags=["-C prefer-dynamic"]
@@ -27,6 +28,7 @@ num-bigint = "*"
 
 [dependencies.carrot_libs]
 path = "../carrot-libs"
+
 
 [[bin]]
 name = "rush"

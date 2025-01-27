@@ -185,6 +185,12 @@ Thanks Rust.
 ### Added on 21.01.2025
 - Disallow running empty commands like this: say hello, , say bye
 
+# Release 0.5.2
+
+### Added 27.01.2025
+
+- Slowly working on IF implementation: It can sort arguments by keyword types
+
 ### Waiting features:
 
 - Implement IF logic

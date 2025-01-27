@@ -1,6 +1,6 @@
+use carrot_libs::args;
 use std::env;
 use std::process;
-use carrot_libs::args;
 
 fn main() {
     let opts = args::opts();

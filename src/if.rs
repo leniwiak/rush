@@ -1,5 +1,20 @@
 use std::collections::HashMap;
 
+#[derive(Eq, Hash, PartialEq)]
+enum DataType {
+    Ok,
+    Fail,
+    Code,
+    Out,
+    Err,
+    Logic,
+    Comparator,
+    Var,
+    Numval,
+    Txtval,
+    Okval,
+}
+
 pub fn logic(buf: Vec<String>) -> Result<bool, String> {
     /*
     if FAIL:thing1 -with-arg -with-another-arg and OK:thing2 or OUT:thing3 and $variable == 10 do
@@ -18,11 +33,11 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
     NUMVAL - Raw number
     TXTVAL - Raw text
     OKVAL - Raw boolean
-    
+
     1. Make a hash map of words from IF/ELSEIF/ELSE until DO.
        Key is a type of the thing and value is the... value.
         > wordlist = [FAIL:thing1 -with-arg -with-another-arg, LOGIC:AND, OK:thing2, LOGIC:OR, OUT:thing3, LOGIC:AND, VAR:variable, COMPARATOR:==, NUMVAR:10, LOGIC:DO]
-    
+
     2. Iterate through wordlist
 
     3. Look up for the first word in a list. It may be anything but LOGIC and COMPARATOR.
@@ -61,7 +76,7 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
        If you find a [LOGIC:DO]:
         > Check if previous block is of type OKVAL
         > Add to a global script iteration index a value which is an index of DO. (Do smth like INDEX += position-of-do NOT INDEX = position_of_do).
-        > Set shell_mode as CmpSuccess or CmpFailure based on the value from OKVAL 
+        > Set shell_mode as CmpSuccess or CmpFailure based on the value from OKVAL
         > End this IF statement
        If you find a [LOGIC:AND] or [LOGIC:OR]:
         > IF statement can't be finished yet. Report the need for another comparable thing.
@@ -80,7 +95,7 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
           ~~, =~, ~=, ~   CONTAINS (only for TXTVALs)
     6. After exactly one COMPARATOR or LOGIC (other than DO), another OK, FAIL, CODE, OUT, ERR, VAL, NUMVAL or TXTVAL is needed
     7. Repeat step 4 to parse right comparable object of type OK, FAIL, CODE, OUT, ERR, VAL, NUMVAL or TXTVAL.
-    
+
     8. This was a right comparable object in an LEFT_CMD LOGIC/COMPARATOR RIGHT_CMD block.
        Now, check type of this and this-2 wordlist element
        and allow comparing them depending on if_operation_mode value.
@@ -96,66 +111,167 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
        Otherwise, replace them with OKVAL:0
     11. Iterate through wordlist again
     */
-    //let a = index();
+
+    /*
+    If statement accepts arguments with more than one word.
+    But if this is the case, we have to understand where some words belong.
+    For example, if you aproach a word like "door". What you should do with it?
+    It isn't a command. It's a plain text value. But can we be sure about it?
+    A word "door" can be a part of a command, like in this example:
+    if OK:command_that_accepts_args door do ... ;
+
+    The best way to achieve this, is to join all of the words together.
+    For example, word "door" after "OK:command_that_accepts_args" must be "glued up" with a command
+    To avoid confusion, TXTVALs also have to be joined into one thing.
+     */
+    let mut normalized_buf = Vec::new();
+
+    let mut append_to_last_word_instead_buf = false;
+    // Iterate through words except the first one which is just "IF"
+
+    /*
+    Join any words after CODE:program_name.
+    This allows the user to just type the command they want to execute like this: CODE:something blah blah
+    instead of wraping the command in quotation marks like this: CODE:"funny command here"
+    */
+    for word in buf {
+        if word.to_uppercase().starts_with("OK:")
+            || word.to_uppercase().starts_with("FAIL:")
+            || word.to_uppercase().starts_with("CODE:")
+            || word.to_uppercase().starts_with("OUT:")
+            || word.to_uppercase().starts_with("ERR:")
+        {
+            // Push first word to the buffer
+            normalized_buf.push(word.to_string());
+            // Allow appending unresolved keywords to the word instead of the buffer itself
+            append_to_last_word_instead_buf = true;
+        }
+        // Just append known keywords to the buffer of commands
+        else if word.to_uppercase() == "AND"
+            || word.to_uppercase() == "OR"
+            || word.to_uppercase() == "DO"
+            || word == "=="
+            || word == "="
+            || word == "!"
+            || word == "!="
+            || word == "=!"
+            || word == "=<"
+            || word == "=>"
+            || word == "<="
+            || word == ">="
+            || word == "<"
+            || word == ">"
+            || word == "~"
+            || word == "~~"
+            || word == "~="
+            || word == "=~"
+            // Allow numbers too!
+            || word.parse::<usize>().is_ok()
+            // Allow words starting with single/double quotation marks
+            || word.starts_with('\'')
+            || word.starts_with('"')
+        {
+            normalized_buf.push(word.to_string());
+            append_to_last_word_instead_buf = false;
+        }
+        // If you approach unknown word
+        else {
+            // Append it to the last word in the buffer instead of the buffer itself
+            // if it is a part of CODE:, OUT: or ERR: statement
+            if append_to_last_word_instead_buf {
+                normalized_buf
+                    .last_mut()
+                    .unwrap()
+                    .push_str(format!(" {}", word).as_str());
+            } else {
+                return Err(format!("Unknown keyword: {word}"));
+            }
+        }
+
+        // Find common errors
+        if word.to_uppercase().trim() == "OK:"
+            || word.to_uppercase().trim() == "FAIL:"
+            || word.to_uppercase().trim() == "CODE:"
+            || word.to_uppercase().trim() == "OUT:"
+            || word.to_uppercase().trim() == "ERR:"
+        {
+            return Err(format!(
+                "Used command referer \"{}\" without specifying a command",
+                word
+            ));
+        }
+    }
+
+    dbg!(&normalized_buf);
+    return Ok(true);
 
     let mut big_mommy = HashMap::new();
     for (i, w) in buf.clone().into_iter().enumerate() {
         if w.starts_with("OK:") {
-            big_mommy.insert("OK:", buf[i].strip_prefix("OK:").unwrap());
-        }
-        else if w.starts_with("FAIL:") {
-            big_mommy.insert("FAIL:", buf[i].strip_prefix("FAIL:").unwrap());
-        }
-        else if w.starts_with("CODE:") {
-            big_mommy.insert("CODE:", buf[i].strip_prefix("CODE:").unwrap());
-        }
-        else if w.starts_with("OUT:") {
-            big_mommy.insert("OUT:", buf[i].strip_prefix("OUT:").unwrap());
-        }
-        else if w.starts_with("ERR:") {
-            big_mommy.insert("ERR:", buf[i].strip_prefix("ERR:").unwrap());
-        }
-        else if w == "AND" {
-            big_mommy.insert("LOGIC:", "AND");
-        }
-        else if w == "OR" {
-            big_mommy.insert("LOGIC:", "OR");
-        }
-        else if w == "DO" {
-            big_mommy.insert("LOGIC:", "DO");
-        }
-        else if w == "==" || w == "=" {
-            big_mommy.insert("COMPARATOR:", "EQUAL");
-        }
-        else if w == "!=" || w == "=!" || w == "!" {
-            big_mommy.insert("COMPARATOR:", "DIFFERENT");
-        }
-        else if w == "<" {
-            big_mommy.insert("COMPARATOR:", "LESS");
-        }
-        else if w == "=<" || w == "<=" {
-            big_mommy.insert("COMPARATOR:", "LESS_OR_EQUAL");
-        }
-        else if w == ">" {
-            big_mommy.insert("COMPARATOR:", "GREATER");
-        }
-        else if w == ">=" || w == "=>" {
-            big_mommy.insert("COMPARATOR:", "GREATER_OR_EQUAL");
-        }
-        else if w == "~~" || w == "~" || w == "~=" || w == "=~" {
-            big_mommy.insert("COMPARATOR:", "CONTAINS");
-        }
-        else {
+            big_mommy.insert(
+                DataType::Ok,
+                buf[i].strip_prefix("OK:").unwrap().to_string(),
+            );
+        } else if w.to_uppercase().starts_with("FAIL:") {
+            big_mommy.insert(
+                DataType::Fail,
+                buf[i].strip_prefix("FAIL:").unwrap().to_string(),
+            );
+        } else if w.to_uppercase().starts_with("CODE:") {
+            big_mommy.insert(
+                DataType::Code,
+                buf[i].strip_prefix("CODE:").unwrap().to_string(),
+            );
+        } else if w.to_uppercase().starts_with("OUT:") {
+            big_mommy.insert(
+                DataType::Out,
+                buf[i].strip_prefix("OUT:").unwrap().to_string(),
+            );
+        } else if w.to_uppercase().starts_with("ERR:") {
+            big_mommy.insert(
+                DataType::Err,
+                buf[i].strip_prefix("ERR:").unwrap().to_string(),
+            );
+        } else if w.to_uppercase() == "AND" {
+            big_mommy.insert(DataType::Logic, String::from("AND"));
+        } else if w.to_uppercase() == "OR" {
+            big_mommy.insert(DataType::Logic, String::from("OR"));
+        } else if w.to_uppercase() == "DO" {
+            big_mommy.insert(DataType::Logic, String::from("DO"));
+        } else if w == "==" || w == "=" {
+            big_mommy.insert(DataType::Comparator, String::from("EQUAL"));
+        } else if w == "!=" || w == "=!" || w == "!" {
+            big_mommy.insert(DataType::Comparator, String::from("DIFFERENT"));
+        } else if w == "<" {
+            big_mommy.insert(DataType::Comparator, String::from("LESS"));
+        } else if w == "=<" || w == "<=" {
+            big_mommy.insert(DataType::Comparator, String::from("LESS_OR_EQUAL"));
+        } else if w == ">" {
+            big_mommy.insert(DataType::Comparator, String::from("GREATER"));
+        } else if w == ">=" || w == "=>" {
+            big_mommy.insert(DataType::Comparator, String::from("GREATER_OR_EQUAL"));
+        } else if w == "~~" || w == "~" || w == "~=" || w == "=~" {
+            big_mommy.insert(DataType::Comparator, String::from("CONTAINS"));
+        } else {
             let is_num = w.parse::<usize>().is_ok();
             if is_num {
-                //big_mommy.insert("NUMVAL:", &w);
-                todo!();
+                big_mommy.insert(DataType::Numval, w);
             } else {
-                //big_mommy.insert("TXTVAL:", &w);
-                todo!();
+                big_mommy.insert(DataType::Txtval, w);
             }
         }
+    }
 
+    for dataunit in big_mommy {
+        match dataunit.0 {
+            DataType::Logic | DataType::Comparator => {
+                return Err(
+                    "Use of logical operator or comparator at the beginning of logical statement"
+                        .to_string(),
+                )
+            }
+            _ => todo!(),
+        }
     }
     Ok(true)
 }

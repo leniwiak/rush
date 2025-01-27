@@ -1,6 +1,6 @@
+use std::process;
 use std::thread;
 use std::time;
-use std::process;
 // This is how to import other files from rush when the current source file is NOT imported in "rush.rs"
 use carrot_libs::args;
 
@@ -9,11 +9,11 @@ fn main() {
     let (swcs, vals) = args::swcs();
 
     // Refuse to run when switches have been passed
-    if ! swcs.is_empty() {
+    if !swcs.is_empty() {
         eprintln!("This program does not support any switches and values!");
         process::exit(1);
     };
-    if ! vals.is_empty() {
+    if !vals.is_empty() {
         eprintln!("This program does not support any switches and values!");
         process::exit(1);
     };
@@ -29,8 +29,7 @@ fn main() {
         // "returns" contains information about all return codes that were reported by commands
         // Both variables are required because "returns" will be modified by "report_failure" according to the contents of "index"
         std::process::exit(1);
-    }
-    else {
+    } else {
         // Parse argument to make sure it is a number
         match opts[0].parse::<u64>() {
             Ok(ret) => {

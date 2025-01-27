@@ -9,10 +9,10 @@ pub struct RushConfig {
 }
 // `Default` settings for `MyConfig`
 impl ::std::default::Default for RushConfig {
-    fn default() -> Self { 
-        Self { 
+    fn default() -> Self {
+        Self {
             prompt: "> ".into(),
             aliases: HashMap::new(),
-        } 
+        }
     }
 }
