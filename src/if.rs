@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq, Debug)]
 enum DataType {
     Ok,
     Fail,
@@ -134,7 +132,7 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
     This allows the user to just type the command they want to execute like this: CODE:something blah blah
     instead of wraping the command in quotation marks like this: CODE:"funny command here"
     */
-    for word in buf {
+    for word in &buf {
         if word.to_uppercase().starts_with("OK:")
             || word.to_uppercase().starts_with("FAIL:")
             || word.to_uppercase().starts_with("CODE:")
@@ -165,6 +163,8 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
             || word == "~~"
             || word == "~="
             || word == "=~"
+            // Allow reffering to variables
+            || word.starts_with('$')
             // Allow numbers too!
             || word.parse::<usize>().is_ok()
             // Allow words starting with single/double quotation marks
@@ -202,75 +202,83 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
         }
     }
 
-    dbg!(&normalized_buf);
-    return Ok(true);
-
-    let mut big_mommy = HashMap::new();
+    let mut big_mommy = Vec::new();
     for (i, w) in buf.clone().into_iter().enumerate() {
-        if w.starts_with("OK:") {
-            big_mommy.insert(
+        if w.to_uppercase().starts_with("OK:") {
+            big_mommy.push((
                 DataType::Ok,
                 buf[i].strip_prefix("OK:").unwrap().to_string(),
-            );
+            ));
         } else if w.to_uppercase().starts_with("FAIL:") {
-            big_mommy.insert(
+            big_mommy.push((
                 DataType::Fail,
                 buf[i].strip_prefix("FAIL:").unwrap().to_string(),
-            );
+            ));
         } else if w.to_uppercase().starts_with("CODE:") {
-            big_mommy.insert(
+            big_mommy.push((
                 DataType::Code,
                 buf[i].strip_prefix("CODE:").unwrap().to_string(),
-            );
+            ));
         } else if w.to_uppercase().starts_with("OUT:") {
-            big_mommy.insert(
+            big_mommy.push((
                 DataType::Out,
                 buf[i].strip_prefix("OUT:").unwrap().to_string(),
-            );
+            ));
         } else if w.to_uppercase().starts_with("ERR:") {
-            big_mommy.insert(
+            big_mommy.push((
                 DataType::Err,
                 buf[i].strip_prefix("ERR:").unwrap().to_string(),
-            );
+            ));
+        } else if w.starts_with('$') {
+            big_mommy.push((DataType::Var, w.strip_prefix('$').unwrap().to_string()));
         } else if w.to_uppercase() == "AND" {
-            big_mommy.insert(DataType::Logic, String::from("AND"));
+            big_mommy.push((DataType::Logic, String::from("AND")));
         } else if w.to_uppercase() == "OR" {
-            big_mommy.insert(DataType::Logic, String::from("OR"));
+            big_mommy.push((DataType::Logic, String::from("OR")));
         } else if w.to_uppercase() == "DO" {
-            big_mommy.insert(DataType::Logic, String::from("DO"));
+            big_mommy.push((DataType::Logic, String::from("DO")));
         } else if w == "==" || w == "=" {
-            big_mommy.insert(DataType::Comparator, String::from("EQUAL"));
+            big_mommy.push((DataType::Comparator, String::from("EQUAL")));
         } else if w == "!=" || w == "=!" || w == "!" {
-            big_mommy.insert(DataType::Comparator, String::from("DIFFERENT"));
+            big_mommy.push((DataType::Comparator, String::from("DIFFERENT")));
         } else if w == "<" {
-            big_mommy.insert(DataType::Comparator, String::from("LESS"));
+            big_mommy.push((DataType::Comparator, String::from("LESS")));
         } else if w == "=<" || w == "<=" {
-            big_mommy.insert(DataType::Comparator, String::from("LESS_OR_EQUAL"));
+            big_mommy.push((DataType::Comparator, String::from("LESS_OR_EQUAL")));
         } else if w == ">" {
-            big_mommy.insert(DataType::Comparator, String::from("GREATER"));
+            big_mommy.push((DataType::Comparator, String::from("GREATER")));
         } else if w == ">=" || w == "=>" {
-            big_mommy.insert(DataType::Comparator, String::from("GREATER_OR_EQUAL"));
+            big_mommy.push((DataType::Comparator, String::from("GREATER_OR_EQUAL")));
         } else if w == "~~" || w == "~" || w == "~=" || w == "=~" {
-            big_mommy.insert(DataType::Comparator, String::from("CONTAINS"));
+            big_mommy.push((DataType::Comparator, String::from("CONTAINS")));
         } else {
             let is_num = w.parse::<usize>().is_ok();
             if is_num {
-                big_mommy.insert(DataType::Numval, w);
+                big_mommy.push((DataType::Numval, w));
             } else {
-                big_mommy.insert(DataType::Txtval, w);
+                big_mommy.push((DataType::Txtval, w));
             }
         }
     }
 
-    for dataunit in big_mommy {
-        match dataunit.0 {
-            DataType::Logic | DataType::Comparator => {
-                return Err(
-                    "Use of logical operator or comparator at the beginning of logical statement"
-                        .to_string(),
-                )
-            }
-            _ => todo!(),
+    for (idx, dataunit) in big_mommy.iter().enumerate() {
+        if idx + 1 == big_mommy.len()
+            && !matches!(dataunit.0, DataType::Logic)
+            && dataunit.1 != "DO"
+        {
+            return Err("Required keyword \"DO\" is missing".to_string());
+        }
+        if idx % 2 == 0
+            && (matches!(dataunit.0, DataType::Logic) | matches!(dataunit.0, DataType::Comparator))
+        {
+            return Err("Found a logical operator when comparator was expected".to_string());
+        } else if idx % 2 != 0
+            && !matches!(dataunit.0, DataType::Logic)
+            && !matches!(dataunit.0, DataType::Comparator)
+        {
+            return Err("Found a comparator when logical operator was expected".to_string());
+        } else {
+            println!("OK");
         }
     }
     Ok(true)

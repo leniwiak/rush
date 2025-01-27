@@ -24,7 +24,6 @@ ctrlc = "*"
 confy = "*"
 serde = "*"
 serde_derive = "*"
-num-bigint = "*"
 
 [dependencies.carrot_libs]
 path = "../carrot-libs"

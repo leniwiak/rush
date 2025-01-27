@@ -189,7 +189,8 @@ Thanks Rust.
 
 ### Added 27.01.2025
 
-- Slowly working on IF implementation: It can sort arguments by keyword types
+- IF: It is able to retrieve list of arguments and assign their types
+- IF: Should now check the command syntax
 
 ### Waiting features:
 
