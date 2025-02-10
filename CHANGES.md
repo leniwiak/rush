@@ -196,6 +196,8 @@ Thanks Rust.
 
 - IF: Ability to run commands and collect their exit status/code
 - Remove unescaped quotation marks
+- IF: Return ERROR when the command does not exist
+- IF: Resolve variables!!!
 
 ### Waiting features:
 

@@ -1,6 +1,7 @@
+use std::env;
 use std::process;
 
-#[derive(Eq, Hash, PartialEq, Debug)]
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
 enum DataType {
     Ok,
     Fail,
@@ -260,6 +261,7 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
         }
     }
 
+    // Basically, after every thing to compare, there must be a comparator.
     for (idx, dataunit) in big_mommy.iter().enumerate() {
         if idx % 2 == 0
             && (matches!(dataunit.0, DataType::Logic) | matches!(dataunit.0, DataType::Comparator))
@@ -275,39 +277,84 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
         }
     }
 
+    // Run commands and collect their exit codes
+    // Also, resolve variables here. That should be it for now.
     let mut idx = 0;
     while idx < big_mommy.len() {
-        let dataunit = &big_mommy[idx];
+        let dataunit = big_mommy[idx].clone();
         let cmd = dataunit.1.split_whitespace().collect::<Vec<&str>>();
         let cmdname = cmd[0];
         let cmdargs = cmd.iter().skip(1);
 
-        let exit_code = process::Command::new(cmdname)
-            .args(cmdargs)
-            .status()
-            .unwrap();
-
         match dataunit.0 {
+            // If the thing's type is OK
             DataType::Ok => {
+                // Run a command and collect it's exit status
+                let exit_code = process::Command::new(cmdname)
+                    .args(cmdargs)
+                    .status()
+                    .unwrap();
+                // Remove current element in big_mommy
                 big_mommy.remove(idx);
-                if exit_code.code() == Some(0) {
-                    big_mommy.insert(idx, (DataType::Okval, "1".to_string()))
+                // If the command has been ran, append a value of type OKVAL to the list of
+                // IF's collection of logics
+                if let Some(code) = exit_code.code() {
+                    if code == 0 {
+                        big_mommy.insert(idx, (DataType::Okval, 1.to_string()))
+                    } else {
+                        big_mommy.insert(idx, (DataType::Okval, 0.to_string()))
+                    }
+                } else {
+                    // No command? No bitches.
+                    return Err(format!("An error occured on command \"{}\"", cmdname));
                 }
             }
+            // This code is the exact same thing as the code above, but with reversed returns
             DataType::Fail => {
+                let exit_code = process::Command::new(cmdname)
+                    .args(cmdargs)
+                    .status()
+                    .unwrap();
                 big_mommy.remove(idx);
-                if exit_code.code() != Some(0) {
-                    big_mommy.insert(idx, (DataType::Okval, "1".to_string()))
+
+                if let Some(code) = exit_code.code() {
+                    if code == 0 {
+                        big_mommy.insert(idx, (DataType::Okval, 0.to_string()))
+                    } else {
+                        big_mommy.insert(idx, (DataType::Okval, 1.to_string()))
+                    }
                 } else {
-                    big_mommy.insert(idx, (DataType::Okval, "0".to_string()))
+                    return Err(format!("An error occured on command \"{}\"", cmdname));
                 }
             }
             DataType::Code => {
+                let exit_code = process::Command::new(cmdname)
+                    .args(cmdargs)
+                    .status()
+                    .unwrap();
                 big_mommy.remove(idx);
                 if let Some(code) = exit_code.code() {
                     big_mommy.insert(idx, (DataType::Numval, code.to_string()))
                 } else {
-                    big_mommy.insert(idx, (DataType::Okval, "0".to_string()))
+                    return Err(format!("An error occured on command \"{}\"", cmdname));
+                }
+            }
+            DataType::Var => {
+                let variable = env::var(&dataunit.1);
+                big_mommy.remove(idx);
+                if let Ok(v) = variable {
+                    let num = v.parse::<usize>();
+                    if let Ok(result) = num {
+                        big_mommy.insert(idx, (DataType::Numval, result.to_string()));
+                    } else if v == "TRUE" {
+                        big_mommy.insert(idx, (DataType::Okval, 1.to_string()));
+                    } else if v == "FALSE" {
+                        big_mommy.insert(idx, (DataType::Okval, 0.to_string()));
+                    } else {
+                        big_mommy.insert(idx, (DataType::Txtval, v.to_string()));
+                    }
+                } else {
+                    return Err(format!("Variable \"{}\" is undefined", &dataunit.1));
                 }
             }
             _ => {}
