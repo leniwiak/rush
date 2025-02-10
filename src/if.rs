@@ -1,3 +1,5 @@
+use std::process;
+
 #[derive(Eq, Hash, PartialEq, Debug)]
 enum DataType {
     Ok,
@@ -15,9 +17,9 @@ enum DataType {
 
 pub fn logic(buf: Vec<String>) -> Result<bool, String> {
     /*
-    if FAIL:thing1 -with-arg -with-another-arg and OK:thing2 or OUT:thing3 and $variable == 10 do
+    if FAIL:thing1 -with-arg -with-another-arg and OK:thing2 or OUT:thing3 and $variable == 10;
         say "I'm a bunch of words on your screen"
-    end
+    ;
 
     Possible keyword types are:
     OK - Execute a command name with 0 it's exit code is 0 or 1 if anything else
@@ -25,22 +27,22 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
     CODE - Replace command name
     OUT - Replace command with it's stdout output
     ERR - Replace command with it's stderr output
-    LOGIC - AND/OR/DO
+    LOGIC - AND/OR
     COMPARATOR - ==, <, >, >=, etc.
     VAR - Replace variable with it's contents
     NUMVAL - Raw number
     TXTVAL - Raw text
     OKVAL - Raw boolean
 
-    1. Make a hash map of words from IF/ELSEIF/ELSE until DO.
+    1. Make a hash map of words from IF/ELSEIF/ELSE until ";""
        Key is a type of the thing and value is the... value.
-        > wordlist = [FAIL:thing1 -with-arg -with-another-arg, LOGIC:AND, OK:thing2, LOGIC:OR, OUT:thing3, LOGIC:AND, VAR:variable, COMPARATOR:==, NUMVAR:10, LOGIC:DO]
+        > wordlist = [FAIL:thing1 -with-arg -with-another-arg, LOGIC:AND, OK:thing2, LOGIC:OR, OUT:thing3, LOGIC:AND, VAR:variable, COMPARATOR:==, NUMVAR:10]
 
     2. Iterate through wordlist
 
     3. Look up for the first word in a list. It may be anything but LOGIC and COMPARATOR.
        We do not accept LOGICs nor COMPARATORs at this moment because we want to prevent the user from typing something
-       like "if and thing1 do ..." or "if == thing1 and thing2 do ..."
+       like "if and thing1 ... ;" or "if == thing1 and thing2 ... ;"
 
     4. At this point, we need a left comparable object.
        This has to be a key of type OK, FAIL, CODE, OUT, ERR, VAL, OKVAL, NUMVAL or TXTVAL.
@@ -71,9 +73,9 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
        Leave every OKVAL, NUMVAL and TXTVAL as is.
     5. After exactly one CODE/OUT/ERR/VAL was translated to OKVAL, NUMVAL or TXTVAL,
        a COMPARATOR or LOGIC is required.
-       If you find a [LOGIC:DO]:
+       If you find reach the end of an IF comparison statement ";":
         > Check if previous block is of type OKVAL
-        > Add to a global script iteration index a value which is an index of DO. (Do smth like INDEX += position-of-do NOT INDEX = position_of_do).
+        > Add to a global script iteration index a value which is an index of this IF. (Do smth like INDEX += position-of-if NOT INDEX = position_of_if).
         > Set shell_mode as CmpSuccess or CmpFailure based on the value from OKVAL
         > End this IF statement
        If you find a [LOGIC:AND] or [LOGIC:OR]:
@@ -91,7 +93,7 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
           >               GREATER (only for NUMVALs)
           >= or =>        GREATER_OR_EQUAL (only for NUMVALs)
           ~~, =~, ~=, ~   CONTAINS (only for TXTVALs)
-    6. After exactly one COMPARATOR or LOGIC (other than DO), another OK, FAIL, CODE, OUT, ERR, VAL, NUMVAL or TXTVAL is needed
+    6. After exactly one COMPARATOR or LOGIC, another OK, FAIL, CODE, OUT, ERR, VAL, NUMVAL or TXTVAL is needed
     7. Repeat step 4 to parse right comparable object of type OK, FAIL, CODE, OUT, ERR, VAL, NUMVAL or TXTVAL.
 
     8. This was a right comparable object in an LEFT_CMD LOGIC/COMPARATOR RIGHT_CMD block.
@@ -147,7 +149,6 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
         // Just append known keywords to the buffer of commands
         else if word.to_uppercase() == "AND"
             || word.to_uppercase() == "OR"
-            || word.to_uppercase() == "DO"
             || word == "=="
             || word == "="
             || word == "!"
@@ -235,8 +236,6 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
             big_mommy.push((DataType::Logic, String::from("AND")));
         } else if w.to_uppercase() == "OR" {
             big_mommy.push((DataType::Logic, String::from("OR")));
-        } else if w.to_uppercase() == "DO" {
-            big_mommy.push((DataType::Logic, String::from("DO")));
         } else if w == "==" || w == "=" {
             big_mommy.push((DataType::Comparator, String::from("EQUAL")));
         } else if w == "!=" || w == "=!" || w == "!" {
@@ -262,12 +261,6 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
     }
 
     for (idx, dataunit) in big_mommy.iter().enumerate() {
-        if idx + 1 == big_mommy.len()
-            && !matches!(dataunit.0, DataType::Logic)
-            && dataunit.1 != "DO"
-        {
-            return Err("Required keyword \"DO\" is missing".to_string());
-        }
         if idx % 2 == 0
             && (matches!(dataunit.0, DataType::Logic) | matches!(dataunit.0, DataType::Comparator))
         {
@@ -278,8 +271,50 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
         {
             return Err("Found a comparator when logical operator was expected".to_string());
         } else {
-            println!("OK");
+            //println!("{}", dataunit.1);
         }
     }
+
+    let mut idx = 0;
+    while idx < big_mommy.len() {
+        let dataunit = &big_mommy[idx];
+        let cmd = dataunit.1.split_whitespace().collect::<Vec<&str>>();
+        let cmdname = cmd[0];
+        let cmdargs = cmd.iter().skip(1);
+
+        let exit_code = process::Command::new(cmdname)
+            .args(cmdargs)
+            .status()
+            .unwrap();
+
+        match dataunit.0 {
+            DataType::Ok => {
+                big_mommy.remove(idx);
+                if exit_code.code() == Some(0) {
+                    big_mommy.insert(idx, (DataType::Okval, "1".to_string()))
+                }
+            }
+            DataType::Fail => {
+                big_mommy.remove(idx);
+                if exit_code.code() != Some(0) {
+                    big_mommy.insert(idx, (DataType::Okval, "1".to_string()))
+                } else {
+                    big_mommy.insert(idx, (DataType::Okval, "0".to_string()))
+                }
+            }
+            DataType::Code => {
+                big_mommy.remove(idx);
+                if let Some(code) = exit_code.code() {
+                    big_mommy.insert(idx, (DataType::Numval, code.to_string()))
+                } else {
+                    big_mommy.insert(idx, (DataType::Okval, "0".to_string()))
+                }
+            }
+            _ => {}
+        };
+
+        idx += 1;
+    }
+
     Ok(true)
 }

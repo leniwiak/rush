@@ -199,14 +199,13 @@ fn remove_quotationmarks(script: Vec<String>) {
     for w in script {
         for c in w.chars() {
             // If current character is a qmark AND it's preceded by a slash, remove the slash from string
-            if let Some(last) = str.chars().last() {
-                //dbg!(&w, c, c=='\'' || c=='"',last!='\\');
-                //println!();
-                if (c == '\'' || c == '"') && last == '\\' {
-                    str.pop();
-                }
-            }
             str.push(c);
+            let last = str.chars().last().unwrap_or(' ');
+            dbg!(&w, c, c == '\'' || c == '"', last != '\\');
+            if (c == '\'' || c == '"') && last != '\\' {
+                println!("{c}");
+                str.pop();
+            }
         }
         out.push(str.clone());
         str.clear();

@@ -192,6 +192,11 @@ Thanks Rust.
 - IF: It is able to retrieve list of arguments and assign their types
 - IF: Should now check the command syntax
 
+### Added 10.02.2025
+
+- IF: Ability to run commands and collect their exit status/code
+- Remove unescaped quotation marks
+
 ### Waiting features:
 
 - Implement IF logic
