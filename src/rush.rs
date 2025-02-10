@@ -3,18 +3,18 @@ use carrot_libs::input;
 use std::fs;
 use std::process;
 use std::thread;
+mod config;
 mod directories;
 mod exec;
 mod global;
-mod helpful;
 mod r#if;
 mod variables;
 
+use config::RushConfig;
 use global::{
     allow_interrupts, index, interrupt_now, print_err, set_allow_interrupts, set_index,
     set_interrupt_now,
 };
-use helpful::RushConfig;
 
 #[derive(Debug)]
 enum ShellModes {

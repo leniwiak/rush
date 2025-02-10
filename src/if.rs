@@ -70,12 +70,13 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
             if variable is set to "hello", "[VAR:variable]" will became "[TXTVAL:hello]"
             if variable is set to TRUE, "[VAR:variable]" will became "[OKVAL:1]"
             if variable is set to FALSE, "[VAR:variable]" will became "[OKVAL:0]"
-            BUT if it's set to "TRUE" or "FALSE", it will became "[TXTVAL:TRUE]" or "[TXTVAL:FALSE]"
+            TODO: BUT if it's set to "TRUE" or "FALSE", it will became "[TXTVAL:TRUE]" or "[TXTVAL:FALSE]"
        Leave every OKVAL, NUMVAL and TXTVAL as is.
     5. After exactly one CODE/OUT/ERR/VAL was translated to OKVAL, NUMVAL or TXTVAL,
        a COMPARATOR or LOGIC is required.
-       If you find reach the end of an IF comparison statement ";":
+       If you reach the end of an IF comparison statement ";":
         > Check if previous block is of type OKVAL
+        > There must be just one OKVAL block
         > Add to a global script iteration index a value which is an index of this IF. (Do smth like INDEX += position-of-if NOT INDEX = position_of_if).
         > Set shell_mode as CmpSuccess or CmpFailure based on the value from OKVAL
         > End this IF statement
@@ -98,12 +99,12 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
     7. Repeat step 4 to parse right comparable object of type OK, FAIL, CODE, OUT, ERR, VAL, NUMVAL or TXTVAL.
 
     8. This was a right comparable object in an LEFT_CMD LOGIC/COMPARATOR RIGHT_CMD block.
-       Now, check type of this and this-2 wordlist element
+       Now, check type of this and this 2-word list.
        and allow comparing them depending on if_operation_mode value.
-       > if_operation_mode is AND / OR: Both elements must be of type OKVAL
-       > if_operation_mode is EQUAL / DIFFERENT:  Both elements must be of type TXTVAL or NUMVAL
-       > if_operation_mode is LESS, LESS_OR..., GREATER, GREATER_OR...: Both elements must be of type NUMVAL
-       > if_operation_mode is CONTAINS: Both elements must be of type TXTVAL
+       > if_operation_mode is AND / OR - Both elements must be of type OKVAL
+       > if_operation_mode is EQUAL / DIFFERENT -  Both elements must be of type TXTVAL or NUMVAL
+       > if_operation_mode is LESS, LESS_OR..., GREATER, GREATER_OR... - Both elements must be of type NUMVAL
+       > if_operation_mode is CONTAINS - Both elements must be of type TXTVAL
        In other case, just skip comparison.
     10. Replace those three elements with OKVAL:1 if...
        > if_operation_mode = AND and both comparable objects are set to OKVAL:1
@@ -198,12 +199,14 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
             || word.to_uppercase().trim() == "ERR:"
         {
             return Err(format!(
-                "Used command referer \"{}\" without specifying a command",
+                "Used command referer \"{}\" without specifying a command to run",
                 word
             ));
         }
     }
 
+    // Make a list of all known IF arguments that is easier to understand from the
+    // program's maintainer perspective :DDD
     let mut big_mommy = Vec::new();
     for (i, w) in buf.clone().into_iter().enumerate() {
         if w.to_uppercase().starts_with("OK:") {
@@ -262,7 +265,11 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
     }
 
     // Basically, after every thing to compare, there must be a comparator.
-    for (idx, dataunit) in big_mommy.iter().enumerate() {
+    // Check for the syntax before we do anything fancy.
+    let mut idx = 0;
+    while idx < big_mommy.len() {
+        let dataunit = big_mommy[idx].clone();
+
         if idx % 2 == 0
             && (matches!(dataunit.0, DataType::Logic) | matches!(dataunit.0, DataType::Comparator))
         {
@@ -275,10 +282,14 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
         } else {
             //println!("{}", dataunit.1);
         }
+        idx += 1;
     }
 
-    // Run commands and collect their exit codes
-    // Also, resolve variables here. That should be it for now.
+    /*
+    Here comes the fancy stuff!
+    Run commands and collect their exit codes
+    Also, resolve variables here. That should be it for now.
+    */
     let mut idx = 0;
     while idx < big_mommy.len() {
         let dataunit = big_mommy[idx].clone();
@@ -359,7 +370,6 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
             }
             _ => {}
         };
-
         idx += 1;
     }
 
