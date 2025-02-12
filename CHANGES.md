@@ -199,6 +199,10 @@ Thanks Rust.
 - IF: Return ERROR when the command does not exist
 - IF: Resolve variables!!!
 
+### Added on 12.02.2025
+
+- IF: Return final exit value
+
 ### Waiting features:
 
 - Implement IF logic

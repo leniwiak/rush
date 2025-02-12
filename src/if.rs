@@ -370,8 +370,70 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
             }
             _ => {}
         };
+
+        /*
+        If you are at some (not the first one) even indexed comparison statement, check previous comparator
+        and replace last three elements if OKVAL:1 or OKVAL:0.
+        For instance:
+          skip this one         raaaaaah!!!11!!!!1!1!!1
+              |                   |
+             \/                  \/
+        if OKVAL:1 LOGIC:AND OK:command2;
+        Look for previous LOGIC element and replace this group of three elements with just one OKVAL.
+
+        It's easy.
+        */
+        if idx % 2 == 0 && idx > 1 {
+            let prev_dataunit = big_mommy[idx - 2].clone();
+            let prev_dataunit_type = prev_dataunit.0;
+            let prev_dataunit_istrue = prev_dataunit.1 == "1";
+
+            let prev_comparator = big_mommy[idx - 1].clone();
+            let prev_comparator_type = prev_comparator.0;
+            let prev_comparator_isand = prev_comparator.1.to_uppercase() == "AND";
+
+            let current_dataunit_type = &big_mommy[idx].0;
+            let current_dataunit_istrue = &big_mommy[idx].1 == "1";
+
+            if matches!(prev_comparator_type, DataType::Logic)
+                && matches!(prev_dataunit_type, DataType::Okval)
+                && matches!(current_dataunit_type, DataType::Okval)
+            {
+                let replace_group_with = match (
+                    prev_dataunit_istrue,
+                    prev_comparator_isand,
+                    current_dataunit_istrue,
+                ) {
+                    // AND
+                    (true, true, true) => 1,
+                    // OR
+                    (true, false, true) | (false, false, true) | (true, false, false) => 1,
+                    _ => 0,
+                };
+                dbg!(&big_mommy[idx - 2], &big_mommy[idx - 1], &big_mommy[idx]);
+                // Remove three last elements in IF logic memory
+                big_mommy.remove(idx);
+                big_mommy.remove(idx - 1);
+                big_mommy.remove(idx - 2);
+                // Insert whatever you got from previous match operation
+                big_mommy.insert(idx - 2, (DataType::Okval, replace_group_with.to_string()));
+                // Decrease IDX so it doesn't abnormally overflow
+                idx -= 2;
+            } else {
+                dbg!(
+                    &big_mommy,
+                    idx,
+                    &big_mommy[idx - 2],
+                    &big_mommy[idx - 1],
+                    &big_mommy[idx]
+                );
+                unreachable!("Program's logic contradics itself! Please, report this error to maintainers!\nDon't forget to share debugging information above!");
+            }
+        }
+
         idx += 1;
     }
+    // dbg!(big_mommy);
 
     Ok(true)
 }
