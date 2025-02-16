@@ -189,29 +189,7 @@ fn group_quotationmarks(script: Vec<String>) {
         }
     }
 
-    remove_quotationmarks(buf);
-}
-
-// Remove all unescaped quotationmarks
-fn remove_quotationmarks(script: Vec<String>) {
-    let mut out = Vec::new();
-    let mut str = String::new();
-    for w in script {
-        for c in w.chars() {
-            // If current character is a qmark AND it's preceded by a slash, remove the slash from string
-            str.push(c);
-            let last = str.chars().last().unwrap_or(' ');
-            //dbg!(&w, c, c == '\'' || c == '"', last != '\\');
-            if (c == '\'' || c == '"') && last != '\\' {
-                println!("{c}");
-                str.pop();
-            }
-        }
-        out.push(str.clone());
-        str.clear();
-    }
-
-    syntax_test(out);
+    syntax_test(buf);
 }
 
 enum Builtins {

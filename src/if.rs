@@ -1,5 +1,6 @@
 use std::env;
 use std::process;
+use crate::global;
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 enum DataType {
@@ -95,6 +96,8 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
           >               GREATER (only for NUMVALs)
           >= or =>        GREATER_OR_EQUAL (only for NUMVALs)
           ~~, =~, ~=, ~   CONTAINS (only for TXTVALs)
+          *-              STARTS_WITH (only for TXTVALs)
+          -*              ENDS_WITH (only for TXTVALs)
     6. After exactly one COMPARATOR or LOGIC, another OK, FAIL, CODE, OUT, ERR, VAL, NUMVAL or TXTVAL is needed
     7. Repeat step 4 to parse right comparable object of type OK, FAIL, CODE, OUT, ERR, VAL, NUMVAL or TXTVAL.
 
@@ -166,6 +169,8 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
             || word == "~~"
             || word == "~="
             || word == "=~"
+            || word == "*-"
+            || word == "-*"
             // Allow reffering to variables
             || word.starts_with('$')
             // Allow numbers too!
@@ -254,6 +259,10 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
             big_mommy.push((DataType::Comparator, String::from("GREATER_OR_EQUAL")));
         } else if w == "~~" || w == "~" || w == "~=" || w == "=~" {
             big_mommy.push((DataType::Comparator, String::from("CONTAINS")));
+        } else if w == "*-" {
+            big_mommy.push((DataType::Comparator, String::from("STARTS_WITH")));
+        } else if w == "-*" {
+            big_mommy.push((DataType::Comparator, String::from("ENDS_WITH")));
         } else {
             let is_num = w.parse::<usize>().is_ok();
             if is_num {
@@ -262,6 +271,13 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
                 big_mommy.push((DataType::Txtval, w));
             }
         }
+    }
+
+    // Remove unescaped quotation marks
+    let mut idx = 0;
+    while idx < big_mommy.len() {
+        big_mommy[idx].1 = global::remove_quotationmarks(&big_mommy[idx].1);
+        idx+=1;
     }
 
     // Basically, after every thing to compare, there must be a comparator.
@@ -273,12 +289,12 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
         if idx % 2 == 0
             && (matches!(dataunit.0, DataType::Logic) | matches!(dataunit.0, DataType::Comparator))
         {
-            return Err("Found a logical operator when comparator was expected".to_string());
+            return Err(format!("IF expected a thing to compare in place of \"{}\"", dataunit.1));
         } else if idx % 2 != 0
             && !matches!(dataunit.0, DataType::Logic)
             && !matches!(dataunit.0, DataType::Comparator)
         {
-            return Err("Found a comparator when logical operator was expected".to_string());
+            return Err(format!("IF expected a comparator in place of \"{}\"", dataunit.1));
         } else {
             //println!("{}", dataunit.1);
         }
@@ -372,10 +388,12 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
         };
 
         /*
-        If you are at some (not the first one) even indexed comparison statement, check previous comparator
-        and replace last three elements if OKVAL:1 or OKVAL:0.
+        If you are at some (not the first one) even numbered comparison statement,
+        check two previous things to compare, compare them accoring to their type and used comparator
+        and finally, replace all those three elements with just one, simple OKVAL:1 or OKVAL:0.
+
         For instance:
-          skip this one         raaaaaah!!!11!!!!1!1!!1
+          skip this one         raaaaaah!!!11!!!!1!1!!1 resolve it to an OKVAL and compare!
               |                   |
              \/                  \/
         if OKVAL:1 LOGIC:AND OK:command2;
@@ -384,56 +402,131 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
         It's easy.
         */
         if idx % 2 == 0 && idx > 1 {
-            let prev_dataunit = big_mommy[idx - 2].clone();
-            let prev_dataunit_type = prev_dataunit.0;
-            let prev_dataunit_istrue = prev_dataunit.1 == "1";
+            // Collect all the required info for future operation
+            let first_dataunit = big_mommy[idx - 2].clone();
+            let first_dataunit_type = first_dataunit.0;
+            let first_dataunit_content = first_dataunit.1;
+            let first_dataunit_istrue = first_dataunit_content == "1";
 
-            let prev_comparator = big_mommy[idx - 1].clone();
-            let prev_comparator_type = prev_comparator.0;
-            let prev_comparator_isand = prev_comparator.1.to_uppercase() == "AND";
+            let this_comparator = big_mommy[idx - 1].clone();
+            let this_comparator_content = this_comparator.1.to_uppercase();
 
-            let current_dataunit_type = &big_mommy[idx].0;
-            let current_dataunit_istrue = &big_mommy[idx].1 == "1";
+            let second_dataunit = big_mommy[idx].clone();
+            let second_dataunit_type = second_dataunit.0;
+            let second_dataunit_content = second_dataunit.1;
+            let second_dataunit_istrue = big_mommy[idx].1 == "1";
 
-            if matches!(prev_comparator_type, DataType::Logic)
-                && matches!(prev_dataunit_type, DataType::Okval)
-                && matches!(current_dataunit_type, DataType::Okval)
-            {
-                let replace_group_with = match (
-                    prev_dataunit_istrue,
-                    prev_comparator_isand,
-                    current_dataunit_istrue,
-                ) {
-                    // AND
-                    (true, true, true) => 1,
-                    // OR
-                    (true, false, true) | (false, false, true) | (true, false, false) => 1,
-                    _ => 0,
-                };
-                dbg!(&big_mommy[idx - 2], &big_mommy[idx - 1], &big_mommy[idx]);
-                // Remove three last elements in IF logic memory
-                big_mommy.remove(idx);
-                big_mommy.remove(idx - 1);
-                big_mommy.remove(idx - 2);
-                // Insert whatever you got from previous match operation
-                big_mommy.insert(idx - 2, (DataType::Okval, replace_group_with.to_string()));
-                // Decrease IDX so it doesn't abnormally overflow
-                idx -= 2;
-            } else {
-                dbg!(
-                    &big_mommy,
-                    idx,
-                    &big_mommy[idx - 2],
-                    &big_mommy[idx - 1],
-                    &big_mommy[idx]
-                );
-                unreachable!("Program's logic contradics itself! Please, report this error to maintainers!\nDon't forget to share debugging information above!");
+            // Check for proper syntax
+
+            // TODO: This test is erroneous. Running if 'siurek' *- 'siur' and 1 = 3; makes false assumptions that the syntax is incorrect.
+            if first_dataunit_type != second_dataunit_type {
+                idx += 1;
+                continue;
+                //return Err(format!("Type mismatch for IF arguments: \"{}\" and \"{}\"", first_dataunit_content, second_dataunit_content));
             }
+
+            let replace_group_with = {
+                // User compares two OKVALs separated by some AND/OR logic keyword
+                if  matches!(first_dataunit_type, DataType::Okval)
+                    && (this_comparator_content == "AND" || this_comparator_content == "OR")
+                {
+                    let this_comparator_is_true = this_comparator_content == "AND";
+                    match (
+                        first_dataunit_istrue,
+                        this_comparator_is_true,
+                        second_dataunit_istrue,
+                    ) {
+                        // AND
+                        (true, true, true) => 1,
+                        // OR
+                        (true, false, true) | (false, false, true) | (true, false, false) => 1,
+                        _ => 0,
+                    }
+                }
+                // User compares two NUMVALs
+                else if matches!(first_dataunit_type, DataType::Numval) {
+                    let first_dataunit_content = first_dataunit_content.parse::<usize>().unwrap();
+                    let second_dataunit_content = second_dataunit_content.parse::<usize>().unwrap();
+                    match this_comparator_content.as_str() {
+                        "EQUAL" => {
+                            if first_dataunit_content == second_dataunit_content {1}
+                            else {0}
+                        },
+                        "DIFFERENT" => {
+                            if first_dataunit_content != second_dataunit_content {1}
+                            else {0}
+                        },
+                        "LESS" => {
+                            if first_dataunit_content < second_dataunit_content {1}
+                            else {0}
+                        },
+                        "LESS_OR_EQUAL" => {
+                            if first_dataunit_content <= second_dataunit_content {1}
+                            else {0}
+                        },
+                        "GREATER" => {
+                            if first_dataunit_content > second_dataunit_content {1}
+                            else {0}
+                        },
+                        "GREATER_OR_EQUAL" => {
+                            if first_dataunit_content >= second_dataunit_content {1}
+                            else {0}
+                        },
+                        _ => return Err(format!("Untolerable comparator for number values: \"{}\"", this_comparator_content)),
+                    }
+                }
+                // User compares two TXTVALs
+                else if  matches!(first_dataunit_type, DataType::Txtval) {
+                    match this_comparator_content.as_str() {
+                        "EQUAL" => {
+                            if first_dataunit_content == second_dataunit_content {1}
+                            else {0}
+                        },
+                        "DIFFERENT" => {
+                            if first_dataunit_content != second_dataunit_content {1}
+                            else {0}
+                        },
+                        "CONTAINS" => {
+                            if first_dataunit_content.contains(&second_dataunit_content) {1}
+                            else {0}
+                        },
+                        "STARTS_WITH" => {
+                            if first_dataunit_content.starts_with(&second_dataunit_content) {1}
+                            else {0}
+                        },
+                        "ENDS_WITH" => {
+                            if first_dataunit_content.ends_with(&second_dataunit_content) {1}
+                            else {0}
+                        },
+                        _ => return Err(format!("Untolerable comparator for text values: \"{}\"", this_comparator_content)),
+                    }
+                }
+                else {
+                    dbg!(
+                        &big_mommy,
+                        idx,
+                        &big_mommy[idx - 2],
+                        &big_mommy[idx - 1],
+                        &big_mommy[idx]
+                    );
+                    unreachable!("Program's logic contradics itself! Please, report this error to maintainers!\nDon't forget to share all of the debugging information above!");
+                }  
+            };
+            //dbg!(&big_mommy[idx - 2], &big_mommy[idx - 1], &big_mommy[idx]);
+            // Remove three last elements in IF logic memory
+            big_mommy.remove(idx);
+            big_mommy.remove(idx - 1);
+            big_mommy.remove(idx - 2);
+            // Insert whatever you got from previous match operation
+            big_mommy.insert(idx - 2, (DataType::Okval, replace_group_with.to_string()));
+            // Decrease IDX so it doesn't abnormally overflow
+            idx -= 2;
+            
         }
 
         idx += 1;
     }
-    // dbg!(big_mommy);
+    dbg!(big_mommy);
 
     Ok(true)
 }

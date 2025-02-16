@@ -38,3 +38,17 @@ pub fn print_err(e: String, program_name: String, line_number: usize) {
     eprintln!("Program \"{program_name}\" returned an error at line {line_number}:\n{e}");
     //process::exit(1);
 }
+
+// Remove all unescaped quotationmarks even inside words
+pub fn remove_quotationmarks<S:AsRef<str>>(input: S) -> String {
+    let mut str = String::new();
+    for c in input.as_ref().chars() {
+        // If current character is a qmark AND it's preceded by a slash, remove the slash from string
+        str.push(c);
+        let last = str.chars().last().unwrap_or(' ');
+        if (c == '\'' || c == '"') && last != '\\' {
+            str.pop();
+        }
+    }
+    str
+}

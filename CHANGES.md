@@ -203,11 +203,15 @@ Thanks Rust.
 
 - IF: Return final exit value
 
+### Added on 16.02.2025
+
+- IF: New comparators - STARTS_WITH and ENDS_WITH
+- IF: Text and number comparison is now supported
+
 ### Waiting features:
 
-- Implement IF logic
 - History browsing on CLI
-- Variable names resolution
+- Variable names resolution (outside of IFs)
 
 # Release unknown:
 
