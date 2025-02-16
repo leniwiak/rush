@@ -209,9 +209,11 @@ Thanks Rust.
 - IF: Text and number comparison is now supported
 - SAY, NSAY: Show spaces between words
 - RUSH: Use library 'dialoguer' instead of 'libinput' from carrot-libs
+- IF: It works! (hopefully)
 
 ### Waiting features:
 
+- ELSEIF, ELSE
 - History browsing on CLI
 - Variable names resolution (outside of IFs)
 
