@@ -23,6 +23,7 @@ rand = "*"
 ctrlc = "*"
 confy = "*"
 serde = "*"
+dialoguer = "*"
 serde_derive = "*"
 
 [dependencies.carrot_libs]
@@ -44,6 +45,7 @@ path = "src/sleep.rs"
 [[bin]]
 name = "say"
 path = "src/say.rs"
+
 [[bin]]
 name = "nsay"
 path = "src/nsay.rs"

@@ -1,8 +1,8 @@
 use carrot_libs::args;
-use carrot_libs::input;
 use std::fs;
 use std::process;
 use std::thread;
+use dialoguer;
 mod config;
 mod directories;
 mod exec;
@@ -92,9 +92,12 @@ fn main() {
                 }
                 Ok(e) => e,
             };
-            match input::get(cfg.prompt, false) {
+
+            let cmd: Result<String,dialoguer::Error> = dialoguer::Input::new().interact_text();
+
+            match cmd {
                 Ok(e) => {
-                    do_rest_of_magic_or_nothing(Some(e));
+                    do_rest_of_magic_or_nothing(e.split_whitespace().map(|x| x.to_string()).collect());
                 }
                 Err(e) => {
                     eprintln!("Can't get user input: {e}");
@@ -110,9 +113,7 @@ fn main() {
             set_allow_interrupts(true);
             set_interrupt_now(false);
             match fs::read_to_string(o) {
-                Ok(e) => do_rest_of_magic_or_nothing(Some(
-                    e.split_whitespace().map(str::to_string).collect(),
-                )),
+                Ok(e) => do_rest_of_magic_or_nothing(e.split_whitespace().map(|x| x.to_string()).collect()),
                 Err(e) => {
                     eprintln!("Unable to read from script file: {:?}", e.kind());
                     process::exit(1);
@@ -122,18 +123,13 @@ fn main() {
     };
 }
 
-fn do_rest_of_magic_or_nothing(script: Option<Vec<String>>) {
-    if let Some(script) = script {
-        // Do nothing if script is empty
-        if script.is_empty() {
-            print!("");
-            return;
-        }
-
-        group_quotationmarks(script);
-    } else {
+fn do_rest_of_magic_or_nothing(script: Vec<String>) {
+    // Do nothing if script is empty
+    if script.is_empty() {
         print!("");
+        return;
     }
+    group_quotationmarks(script);
 }
 
 /*

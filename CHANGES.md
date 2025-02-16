@@ -207,6 +207,8 @@ Thanks Rust.
 
 - IF: New comparators - STARTS_WITH and ENDS_WITH
 - IF: Text and number comparison is now supported
+- SAY, NSAY: Show spaces between words
+- RUSH: Use library 'dialoguer' instead of 'libinput' from carrot-libs
 
 ### Waiting features:
 
