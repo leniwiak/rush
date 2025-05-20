@@ -2,6 +2,8 @@ use crate::global;
 use crate::global::print_err;
 use std::collections::HashMap;
 use std::env;
+use std::fmt::Debug;
+use std::str;
 use std::process;
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
@@ -528,6 +530,40 @@ fn ref_to_value(big_mommy_element: (DataType, String)) -> Result<(DataType, Stri
             } else {
                 Err(format!("An error occured on command \"{}\"", cmdname))
             }
+        }
+        DataType::Out => {
+            let output_message = process::Command::new(cmdname)
+                .args(cmdargs)
+                .stdout(process::Stdio::inherit())
+                .stderr(process::Stdio::inherit())
+                .output()
+                .unwrap();
+
+            let mut out = String::new();
+
+            out.push_str(match str::from_utf8(&output_message.stdout) {
+                Ok(val) => val,
+                Err(_) => return Err("Got non UTF-8 data from stdout".to_string()),
+            });
+
+            Ok((DataType::Txtval, out))
+        }
+        DataType::Err => {
+            let output_message = process::Command::new(cmdname)
+                .args(cmdargs)
+                .stdout(process::Stdio::inherit())
+                .stderr(process::Stdio::inherit())
+                .output()
+                .unwrap();
+
+            let mut out = String::new();
+
+            out.push_str(match str::from_utf8(&output_message.stderr) {
+                Ok(val) => val,
+                Err(_) => return Err("Got non UTF-8 data from stdout".to_string()),
+            });
+            
+            Ok((DataType::Txtval, out))
         }
         DataType::Var => {
             let variable = env::var(&big_mommy_element.1);
