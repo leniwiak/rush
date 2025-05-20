@@ -337,7 +337,6 @@ pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
         */
 
         // Start with the first one as we are sure, that it is there.
-
         match ref_to_value(big_mommy[0].clone()) {
             Ok(res) => {
                 big_mommy.remove(0);
@@ -346,35 +345,54 @@ pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
             Err(e) => return Err(e),
         };
         
+        // If there are no other comparison statements, just quit.
         if big_mommy.len() < 2 {
             break
         };
+        // Any code below is going to assume that the third element in big_mommy
+        // (which should be a second thing to compare. For instance: A number, text or a command)
+        // exists.
+
+        // Start with the first one as we are sure, that it is there.
+        match ref_to_value(big_mommy[2].clone()) {
+            Ok(res) => {
+                big_mommy.remove(2);
+                big_mommy.insert(2, res);
+            },
+            Err(e) => return Err(e),
+        };
 
         // Collect all the required info for future work
-        let first_dataunit = big_mommy[0].clone();
-        let first_dataunit_type = first_dataunit.0;
-        let first_dataunit_content = first_dataunit.1;
-        let first_dataunit_is_true = first_dataunit_content == "1";
+        let first_value = big_mommy[0].clone();
+        let first_value_type = first_value.0;
+        let first_value_content = first_value.1;
+        let first_value_is_true = first_value_content == "1";
 
         let this_comparator = big_mommy[1].clone();
         let this_comparator_content = this_comparator.1.to_uppercase();
 
-        let second_dataunit = big_mommy[2].clone();
-        let second_dataunit_type = second_dataunit.0;
-        let second_dataunit_content = second_dataunit.1;
-        let second_dataunit_is_true = big_mommy[2].1 == "1";
+        let second_value = big_mommy[2].clone();
+        let second_value_type = second_value.0;
+        let second_value_content = second_value.1;
+        let second_value_is_true = big_mommy[2].1 == "1";
 
-        let replace_group_with; 
+        // If types does not match - throw an error
+        if first_value_type != second_value_type {
+            return Err("Types of values to compare do not match!".to_string());
+        }
+
+        let replace_group_with;
         
         // Compare two OKVALs separated by some AND/OR logic keyword
-        if matches!(first_dataunit_type, DataType::Okval)
+        if matches!(first_value_type, DataType::Okval)
             && (this_comparator_content == "AND" || this_comparator_content == "OR")
         {
-            let this_comparator_is_true = this_comparator_content == "AND";
+            let this_comparison_is_true = this_comparator_content == "AND";
+
             replace_group_with = match (
-                first_dataunit_is_true,
-                this_comparator_is_true,
-                second_dataunit_is_true,
+                first_value_is_true,
+                this_comparison_is_true,
+                second_value_is_true,
             ) {
                 // AND
                 (true, true, true) => 1,
@@ -383,19 +401,19 @@ pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
                 _ => 0,
             }
         }
+
         // Compare two NUMVALs
-        else if matches!(first_dataunit_type, DataType::Numval) {
-            let first_dataunit_content =
-                first_dataunit_content.parse::<usize>().unwrap();
-            let second_dataunit_content =
-                second_dataunit_content.parse::<usize>().unwrap();
+        else if matches!(first_value_type, DataType::Numval) {
+            let first_value_content = first_value_content.parse::<usize>().unwrap();
+            let second_value_content = second_value_content.parse::<usize>().unwrap();
+
             replace_group_with = match this_comparator_content.as_str() {
-                "EQUAL" => (first_dataunit_content == second_dataunit_content).into(),
-                "DIFFERENT" => (first_dataunit_content != second_dataunit_content).into(),
-                "LESS" => (first_dataunit_content < second_dataunit_content).into(),
-                "LESS_OR_EQUAL" => (first_dataunit_content <= second_dataunit_content).into(),
-                "GREATER" => (first_dataunit_content > second_dataunit_content).into(),
-                "GREATER_OR_EQUAL" => (first_dataunit_content >= second_dataunit_content).into(),
+                "EQUAL" => (first_value_content == second_value_content).into(),
+                "DIFFERENT" => (first_value_content != second_value_content).into(),
+                "LESS" => (first_value_content < second_value_content).into(),
+                "LESS_OR_EQUAL" => (first_value_content <= second_value_content).into(),
+                "GREATER" => (first_value_content > second_value_content).into(),
+                "GREATER_OR_EQUAL" => (first_value_content >= second_value_content).into(),
                 _ => {
                     return Err(format!(
                         "Untolerable comparator for number values: \"{}\"",
@@ -404,14 +422,15 @@ pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
                 }
             }
         }
+
         // Compare two TXTVALs
-        else if matches!(first_dataunit_type, DataType::Txtval) {
+        else if matches!(first_value_type, DataType::Txtval) {
             replace_group_with = match this_comparator_content.as_str() {
-                "EQUAL" => (first_dataunit_content == second_dataunit_content).into(),
-                "DIFFERENT" => (first_dataunit_content != second_dataunit_content).into(),
-                "CONTAINS" => (first_dataunit_content.contains(&second_dataunit_content)).into(),
-                "STARTS_WITH" => (first_dataunit_content.starts_with(&second_dataunit_content)).into(),
-                "ENDS_WITH" => (first_dataunit_content.ends_with(&second_dataunit_content)).into(),
+                "EQUAL" => (first_value_content == second_value_content).into(),
+                "DIFFERENT" => (first_value_content != second_value_content).into(),
+                "CONTAINS" => (first_value_content.contains(&second_value_content)).into(),
+                "STARTS_WITH" => (first_value_content.starts_with(&second_value_content)).into(),
+                "ENDS_WITH" => (first_value_content.ends_with(&second_value_content)).into(),
                 _ => {
                     return Err(format!(
                         "Untolerable comparator for text values: \"{}\"",
@@ -430,15 +449,12 @@ pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
             unreachable!("Program's logic contradics itself! Please, report this error to maintainers!\nDon't forget to share all of the debugging information above.");
         };
 
-        // dbg!(&big_mommy[idx - 2], &big_mommy[idx - 1], &big_mommy[idx]);
-
-        // Remove three last elements in IF logic memory
+        // Remove three first elements in IF logic memory
         big_mommy.remove(2);
         big_mommy.remove(1);
         big_mommy.remove(0);
         // Insert whatever you got from previous match operation
         big_mommy.insert(0, (DataType::Okval, replace_group_with.to_string()));
-        // Decrease IDX so it doesn't abnormally overflow
     }
 
     // After we're done with the loop
