@@ -1,4 +1,6 @@
 use crate::global;
+use crate::global::print_err;
+use std::collections::HashMap;
 use std::env;
 use std::process;
 
@@ -19,7 +21,7 @@ enum DataType {
 
 pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
     /*
-    if FAIL:thing1 -with-arg -with-another-arg and OK:thing2 or OUT:thing3 and $variable == 10;
+    if FAIL:thing1 -with-arg -with-another-arg and OK:thing2 or OUT:"thing3 and a word that should not be treated as a keyword" and $variable == 10;
         say "I'm a bunch of words on your screen"
     endif
 
@@ -38,7 +40,7 @@ pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
 
     1. Make a hash map of words from IF/ELSEIF/ELSE until ";""
        Key is a type of the thing and value is the... value.
-        > wordlist = [FAIL:thing1 -with-arg -with-another-arg, LOGIC:AND, OK:thing2, LOGIC:OR, OUT:thing3, LOGIC:AND, VAR:variable, COMPARATOR:==, NUMVAR:10]
+        > wordlist = [FAIL:thing1 -with-arg -with-another-arg, LOGIC:AND, OK:thing2, LOGIC:OR, OUT:thing3 and a word that should not be treated as a keyword, LOGIC:AND, VAR:variable, COMPARATOR:==, NUMVAR:10]
 
     2. Iterate through wordlist
 
@@ -319,280 +321,215 @@ pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
 
     /*
     Here comes the fancy stuff!
-    Run commands and collect their exit codes
-    Also, resolve variables here. That should be it for now.
+    Run commands inside "if comparison" and collect their exit codes.
+    Also, resolve variables to numvals or txtvals.
+    
+    That should be it for now.
     */
-    while big_mommy.len() > 1 {
-        let mut idx = 0;
-        while idx < big_mommy.len() {
-            let dataunit = big_mommy[idx].clone();
-            let cmd = dataunit.1.split_whitespace().collect::<Vec<&str>>();
-            let cmdname = cmd[0];
-            let cmdargs = cmd.iter().skip(1);
+    loop {
+        /*
+        Always resolve commands from first and third elements in comparison statement.
+        If some of these elements are of type OUT or ERR - convert them to TXTVALs first.
+        If some of these are of type CODE - convert them to NUMVALs first.
+        If there is any environment variable reference - convert them to TXT/NUM vals too.
 
-            match dataunit.0 {
-                // If the thing's type is OK
-                DataType::Ok => {
-                    // Run a command and collect it's exit status
-                    let exit_code = process::Command::new(cmdname)
-                        .args(cmdargs)
-                        .status()
-                        .unwrap();
-                    // Remove current element in big_mommy
-                    big_mommy.remove(idx);
-                    // If the command has been ran, append a value of type OKVAL to the list of
-                    // IF's collection of logics
-                    if let Some(code) = exit_code.code() {
-                        if code == 0 {
-                            big_mommy.insert(idx, (DataType::Okval, 1.to_string()))
-                        } else {
-                            big_mommy.insert(idx, (DataType::Okval, 0.to_string()))
-                        }
-                    } else {
-                        // No command? No bitches.
-                        return Err(format!("An error occured on command \"{}\"", cmdname));
-                    }
-                }
-                // This code is the exact same thing as the code above, but with reversed returns
-                DataType::Fail => {
-                    let exit_code = process::Command::new(cmdname)
-                        .args(cmdargs)
-                        .status()
-                        .unwrap();
-                    big_mommy.remove(idx);
+        And also, do nothing if it's just a usual NUMVAL, TXTVAL or an OKVAL.
+        */
 
-                    if let Some(code) = exit_code.code() {
-                        if code == 0 {
-                            big_mommy.insert(idx, (DataType::Okval, 0.to_string()))
-                        } else {
-                            big_mommy.insert(idx, (DataType::Okval, 1.to_string()))
-                        }
-                    } else {
-                        return Err(format!("An error occured on command \"{}\"", cmdname));
-                    }
-                }
-                DataType::Code => {
-                    let exit_code = process::Command::new(cmdname)
-                        .args(cmdargs)
-                        .status()
-                        .unwrap();
-                    big_mommy.remove(idx);
-                    if let Some(code) = exit_code.code() {
-                        big_mommy.insert(idx, (DataType::Numval, code.to_string()))
-                    } else {
-                        return Err(format!("An error occured on command \"{}\"", cmdname));
-                    }
-                }
-                DataType::Var => {
-                    let variable = env::var(&dataunit.1);
-                    big_mommy.remove(idx);
-                    if let Ok(v) = variable {
-                        let num = v.parse::<usize>();
-                        if let Ok(result) = num {
-                            big_mommy.insert(idx, (DataType::Numval, result.to_string()));
-                        } else if v == "TRUE" {
-                            big_mommy.insert(idx, (DataType::Okval, 1.to_string()));
-                        } else if v == "FALSE" {
-                            big_mommy.insert(idx, (DataType::Okval, 0.to_string()));
-                        } else {
-                            big_mommy.insert(idx, (DataType::Txtval, v.to_string()));
-                        }
-                    } else {
-                        return Err(format!("Variable \"{}\" is undefined", &dataunit.1));
-                    }
-                }
-                _ => {}
-            };
+        // Start with the first one as we are sure, that it is there.
 
-            /*
-            If you are at some (not the first one) even numbered comparison statement,
-            check two previous things to compare, compare them accoring to their type and used comparator
-            and finally, replace all those three elements with just one, simple OKVAL:1 or OKVAL:0.
+        match ref_to_value(big_mommy[0].clone()) {
+            Ok(res) => {
+                big_mommy.remove(0);
+                big_mommy.insert(0, res);
+            },
+            Err(e) => return Err(e),
+        };
+        
+        if big_mommy.len() < 2 {
+            break
+        };
 
-            For instance:
-            skip this one         raaaaaah!!!11!!!!1!1!!1 resolve it to an OKVAL and compare!
-                |                   |
-                \/                  \/
-            if OKVAL:1 LOGIC:AND OK:command2;
-            Look for previous LOGIC element and replace this group of three elements with just one OKVAL.
+        // Collect all the required info for future work
+        let first_dataunit = big_mommy[0].clone();
+        let first_dataunit_type = first_dataunit.0;
+        let first_dataunit_content = first_dataunit.1;
+        let first_dataunit_is_true = first_dataunit_content == "1";
 
-            It's easy.
-            */
-            if idx % 2 == 0 && idx > 1 {
-                // Collect all the required info for future operation
-                let first_dataunit = big_mommy[idx - 2].clone();
-                let first_dataunit_type = first_dataunit.0;
-                let first_dataunit_content = first_dataunit.1;
-                let first_dataunit_istrue = first_dataunit_content == "1";
+        let this_comparator = big_mommy[1].clone();
+        let this_comparator_content = this_comparator.1.to_uppercase();
 
-                let this_comparator = big_mommy[idx - 1].clone();
-                let this_comparator_content = this_comparator.1.to_uppercase();
+        let second_dataunit = big_mommy[2].clone();
+        let second_dataunit_type = second_dataunit.0;
+        let second_dataunit_content = second_dataunit.1;
+        let second_dataunit_is_true = big_mommy[2].1 == "1";
 
-                let second_dataunit = big_mommy[idx].clone();
-                let second_dataunit_type = second_dataunit.0;
-                let second_dataunit_content = second_dataunit.1;
-                let second_dataunit_istrue = big_mommy[idx].1 == "1";
-
-                // Check for proper syntax
-                if first_dataunit_type != second_dataunit_type {
-                    idx += 1;
-                    continue;
-                    //return Err(format!("Type mismatch for IF arguments: \"{}\" and \"{}\"", first_dataunit_content, second_dataunit_content));
-                }
-
-                let replace_group_with = {
-                    // User compares two OKVALs separated by some AND/OR logic keyword
-                    if matches!(first_dataunit_type, DataType::Okval)
-                        && (this_comparator_content == "AND" || this_comparator_content == "OR")
-                    {
-                        let this_comparator_is_true = this_comparator_content == "AND";
-                        match (
-                            first_dataunit_istrue,
-                            this_comparator_is_true,
-                            second_dataunit_istrue,
-                        ) {
-                            // AND
-                            (true, true, true) => 1,
-                            // OR
-                            (true, false, true) | (false, false, true) | (true, false, false) => 1,
-                            _ => 0,
-                        }
-                    }
-                    // User compares two NUMVALs
-                    else if matches!(first_dataunit_type, DataType::Numval) {
-                        let first_dataunit_content =
-                            first_dataunit_content.parse::<usize>().unwrap();
-                        let second_dataunit_content =
-                            second_dataunit_content.parse::<usize>().unwrap();
-                        match this_comparator_content.as_str() {
-                            "EQUAL" => {
-                                if first_dataunit_content == second_dataunit_content {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            "DIFFERENT" => {
-                                if first_dataunit_content != second_dataunit_content {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            "LESS" => {
-                                if first_dataunit_content < second_dataunit_content {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            "LESS_OR_EQUAL" => {
-                                if first_dataunit_content <= second_dataunit_content {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            "GREATER" => {
-                                if first_dataunit_content > second_dataunit_content {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            "GREATER_OR_EQUAL" => {
-                                if first_dataunit_content >= second_dataunit_content {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            _ => {
-                                return Err(format!(
-                                    "Untolerable comparator for number values: \"{}\"",
-                                    this_comparator_content
-                                ))
-                            }
-                        }
-                    }
-                    // User compares two TXTVALs
-                    else if matches!(first_dataunit_type, DataType::Txtval) {
-                        match this_comparator_content.as_str() {
-                            "EQUAL" => {
-                                if first_dataunit_content == second_dataunit_content {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            "DIFFERENT" => {
-                                if first_dataunit_content != second_dataunit_content {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            "CONTAINS" => {
-                                if first_dataunit_content.contains(&second_dataunit_content) {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            "STARTS_WITH" => {
-                                if first_dataunit_content.starts_with(&second_dataunit_content) {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            "ENDS_WITH" => {
-                                if first_dataunit_content.ends_with(&second_dataunit_content) {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            _ => {
-                                return Err(format!(
-                                    "Untolerable comparator for text values: \"{}\"",
-                                    this_comparator_content
-                                ))
-                            }
-                        }
-                    } else {
-                        dbg!(
-                            &big_mommy,
-                            idx,
-                            &big_mommy[idx - 2],
-                            &big_mommy[idx - 1],
-                            &big_mommy[idx]
-                        );
-                        unreachable!("Program's logic contradics itself! Please, report this error to maintainers!\nDon't forget to share all of the debugging information above.");
-                    }
-                };
-
-                // dbg!(&big_mommy[idx - 2], &big_mommy[idx - 1], &big_mommy[idx]);
-
-                // Remove three last elements in IF logic memory
-                big_mommy.remove(idx);
-                big_mommy.remove(idx - 1);
-                big_mommy.remove(idx - 2);
-                // Insert whatever you got from previous match operation
-                big_mommy.insert(idx - 2, (DataType::Okval, replace_group_with.to_string()));
-                // Decrease IDX so it doesn't abnormally overflow
-                idx -= 2;
+        let replace_group_with; 
+        
+        // Compare two OKVALs separated by some AND/OR logic keyword
+        if matches!(first_dataunit_type, DataType::Okval)
+            && (this_comparator_content == "AND" || this_comparator_content == "OR")
+        {
+            let this_comparator_is_true = this_comparator_content == "AND";
+            replace_group_with = match (
+                first_dataunit_is_true,
+                this_comparator_is_true,
+                second_dataunit_is_true,
+            ) {
+                // AND
+                (true, true, true) => 1,
+                // OR
+                (true, false, true) | (false, false, true) | (true, false, false) => 1,
+                _ => 0,
             }
-            idx += 1;
         }
+        // Compare two NUMVALs
+        else if matches!(first_dataunit_type, DataType::Numval) {
+            let first_dataunit_content =
+                first_dataunit_content.parse::<usize>().unwrap();
+            let second_dataunit_content =
+                second_dataunit_content.parse::<usize>().unwrap();
+            replace_group_with = match this_comparator_content.as_str() {
+                "EQUAL" => (first_dataunit_content == second_dataunit_content).into(),
+                "DIFFERENT" => (first_dataunit_content != second_dataunit_content).into(),
+                "LESS" => (first_dataunit_content < second_dataunit_content).into(),
+                "LESS_OR_EQUAL" => (first_dataunit_content <= second_dataunit_content).into(),
+                "GREATER" => (first_dataunit_content > second_dataunit_content).into(),
+                "GREATER_OR_EQUAL" => (first_dataunit_content >= second_dataunit_content).into(),
+                _ => {
+                    return Err(format!(
+                        "Untolerable comparator for number values: \"{}\"",
+                        this_comparator_content
+                    ))
+                }
+            }
+        }
+        // Compare two TXTVALs
+        else if matches!(first_dataunit_type, DataType::Txtval) {
+            replace_group_with = match this_comparator_content.as_str() {
+                "EQUAL" => (first_dataunit_content == second_dataunit_content).into(),
+                "DIFFERENT" => (first_dataunit_content != second_dataunit_content).into(),
+                "CONTAINS" => (first_dataunit_content.contains(&second_dataunit_content)).into(),
+                "STARTS_WITH" => (first_dataunit_content.starts_with(&second_dataunit_content)).into(),
+                "ENDS_WITH" => (first_dataunit_content.ends_with(&second_dataunit_content)).into(),
+                _ => {
+                    return Err(format!(
+                        "Untolerable comparator for text values: \"{}\"",
+                        this_comparator_content
+                    ))
+                }
+            }
+        } else {
+            dbg!(
+                &big_mommy,
+                idx,
+                &big_mommy[0],
+                &big_mommy[1],
+                &big_mommy[2]
+            );
+            unreachable!("Program's logic contradics itself! Please, report this error to maintainers!\nDon't forget to share all of the debugging information above.");
+        };
 
-        if big_mommy.len() == 1 && !matches!(big_mommy[0].0, DataType::Okval) {
-            dbg!(&big_mommy);
-            unreachable!("Program's logic contradicts itself! Please, report this error to maintainers!\nDon't forget to share all of the debugging information above.")
-        }
+        // dbg!(&big_mommy[idx - 2], &big_mommy[idx - 1], &big_mommy[idx]);
+
+        // Remove three last elements in IF logic memory
+        big_mommy.remove(2);
+        big_mommy.remove(1);
+        big_mommy.remove(0);
+        // Insert whatever you got from previous match operation
+        big_mommy.insert(0, (DataType::Okval, replace_group_with.to_string()));
+        // Decrease IDX so it doesn't abnormally overflow
     }
-    // dbg!(big_mommy);
 
+    // After we're done with the loop
+    // check for proper type of the only one value inside of our if comparison statement
+    if big_mommy.len() == 1 && !matches!(big_mommy[0].0, DataType::Okval) {
+        dbg!(&big_mommy);
+        unreachable!("Program's logic contradicts itself! Please, report this error to maintainers!\nDon't forget to share all of the debugging information above.")
+    }
+
+    // And check if it is set to 1
     let result_is_true = big_mommy[0].1 == "1";
+    dbg!(&big_mommy);
+
     Ok(result_is_true)
+}
+
+
+fn ref_to_value(big_mommy_element: (DataType, String)) -> Result<(DataType, String), String> {
+    let cmd = big_mommy_element.1.split_whitespace().collect::<Vec<&str>>();
+    let cmdname = cmd[0];
+    let cmdargs = cmd.iter().skip(1);
+
+    match big_mommy_element.0 {
+        // If the thing's type is OK
+        DataType::Ok => {
+            // Run a command and collect it's exit status
+            let exit_code = process::Command::new(cmdname)
+                .args(cmdargs)
+                .status()
+                .unwrap();
+            // If the command has been ran, append a value of type OKVAL to the list of
+            // IF's collection of logics
+            if let Some(code) = exit_code.code() {
+                // Is exit code a zero? Then append OKVAL:SUCCESS to the list
+                if code == 0 {
+                    Ok((DataType::Okval, 1.to_string()))
+                }
+                // or else, append a failure
+                else {
+                    Ok((DataType::Okval, 0.to_string()))
+                }
+            } else {
+                // No command? No bitches.
+                Err(format!("An error occured on command \"{}\"", cmdname))
+            }
+        }
+        // This code is the exact same thing as the code above, but with reversed returns
+        DataType::Fail => {
+            let exit_code = process::Command::new(cmdname)
+                .args(cmdargs)
+                .status()
+                .unwrap();
+            
+            if let Some(code) = exit_code.code() {
+                if code == 0 {
+                    Ok((DataType::Okval, 0.to_string()))
+                } else {
+                    Ok((DataType::Okval, 1.to_string()))
+                }
+            } else {
+                Err(format!("An error occured on command \"{}\"", cmdname))
+            }
+        }
+        DataType::Code => {
+            let exit_code = process::Command::new(cmdname)
+                .args(cmdargs)
+                .status()
+                .unwrap();
+            if let Some(code) = exit_code.code() {
+                Ok((DataType::Numval, code.to_string()))
+            } else {
+                Err(format!("An error occured on command \"{}\"", cmdname))
+            }
+        }
+        DataType::Var => {
+            let variable = env::var(&big_mommy_element.1);
+            if let Ok(v) = variable {
+                let num = v.parse::<usize>();
+                if let Ok(result) = num {
+                    Ok((DataType::Numval, result.to_string()))
+                } else if v == "TRUE" {
+                    Ok((DataType::Okval, 1.to_string()))
+                } else if v == "FALSE" {
+                    Ok((DataType::Okval, 0.to_string()))
+                } else {
+                    Ok((DataType::Txtval, v.to_string()))
+                }
+            } else {
+                Err(format!("Variable \"{}\" is undefined", &big_mommy_element.1))
+            }
+        }
+        _ => Ok(big_mommy_element),
+    }
 }

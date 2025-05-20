@@ -62,7 +62,7 @@ enum ResolvingMode {
 }
 
 // This function removes unescaped slashes
-pub fn resolver<S:AsRef<str>>(input: S, remove_quotation_marks:bool, resolve_variables:bool) -> Result<String, String> {
+pub fn escape_slashes<S:AsRef<str>>(input: S, remove_quotation_marks:bool, resolve_variables:bool) -> Result<String, String> {
     let mut previous_c= ' ';
     let mut variable_name = String::new();
     let mut output = String::new();
@@ -83,16 +83,10 @@ pub fn resolver<S:AsRef<str>>(input: S, remove_quotation_marks:bool, resolve_var
             }
         }
         else if c == '$' && previous_c != '\\' && resolve_variables {
-            match mode {
-                ResolvingMode::None => mode = ResolvingMode::Variable,
-                _ => (),
-            }
+            if let ResolvingMode::None = mode { mode = ResolvingMode::Variable }
         }
         else if c == ' ' {
-            match mode {
-                ResolvingMode::Variable => mode = ResolvingMode::None,
-                _ => (),
-            }
+            if let ResolvingMode::Variable = mode { mode = ResolvingMode::None }
         }
         else if c == '\\' && previous_c != '\\' {
             ();

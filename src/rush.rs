@@ -1,7 +1,7 @@
 use carrot_libs::args;
 use dialoguer;
 use global::remove_quotationmarks;
-use global::resolver;
+use global::escape_slashes;
 use std::fs;
 use std::env;
 use std::process;
@@ -251,8 +251,8 @@ fn syntax_test(script: Vec<String>) {
     if !used_builtins_history.is_empty() {
         for element in used_builtins_history {
             match element {
-                Builtins::Lock(_) => errors.push(format!("Unclosed \"LOCK\" statement")),
-                Builtins::If => errors.push(format!("Unclosed \"IF\" statement")),
+                Builtins::Lock(_) => errors.push(("Unclosed \"LOCK\" statement").to_string()),
+                Builtins::If => errors.push(("Unclosed \"IF\" statement").to_string()),
             }
         }
     }
@@ -330,7 +330,7 @@ fn run_script(script: Vec<String>) {
             // Check whether it's something built into the shell or not.
             let program_name = buf[0].clone();
             if !block_execution {
-                match remove_quotationmarks(program_name).as_str() {
+                match remove_quotationmarks(&program_name).as_str() {
                     /*
                     marbulec was here
                     dito
@@ -504,17 +504,19 @@ fn run_script(script: Vec<String>) {
                     }
 
                     // Comments will never be run
-                    "#" | "endif" | "endlock" => {()},
+                    "#" | "endif" | "endlock" => {},
                     // Not built in?
                     _ => {
                             if let Err(e) = exec::exec(&buf) {
                                 print_err(e, program_name.clone(), line_number);
                             }
-                            let mut resolved_buf = resolver(buf.iter().collect(), true, true);
-                            match resolved_buf {
-                                Err(e) => print_err(e, program_name, line_number),
-                                Ok(gg) => exec(gg),
-                            }
+                            // The fuck was this code about
+                            //
+                            // let mut resolved_buf = resolver(buf.iter().collect(), true, true);
+                            // match resolved_buf {
+                            //     Err(e) => print_err(e, program_name, line_number),
+                            //     Ok(gg) => exec::exec(&gg.split_whitespace()),
+                            // }
                     }
                 };
                 // ... and finally, after command is done, clear the buffer
