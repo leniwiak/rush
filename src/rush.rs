@@ -1,8 +1,11 @@
 use carrot_libs::args;
+use dialoguer;
+use global::remove_quotationmarks;
+use global::resolver;
 use std::fs;
+use std::env;
 use std::process;
 use std::thread;
-use dialoguer;
 mod config;
 mod directories;
 mod exec;
@@ -19,34 +22,29 @@ use global::{
 #[derive(Debug)]
 enum ShellModes {
     /*
-    When you encouter an IF block, allow usage for ELSE and ELSEIF.
-    Wait, till ;, ELSE or ELSEIF is found and when it happens - make comparison, check if it succeeds and when it does,
-    change state of IF to CmpSuccess or CmpFailure.
-    */
-    If(usize),
-    /*
-    Set this mode when comparison inside of an IF block succeeds.
-    This will force the shell to run tasks inside of this particular IF/ELSE/ELSEIF block
-    and skip others under it.
+    Run all commands inside IF/ELSEIF/ELSE block
     */
     CmpSuccess,
     /*
-    Set this mode when comparison inside of an IF block fails.
-    This will force the shell to SKIP tasks inside of this particular IF/ELSE/ELSEIF block
-    and try to run the others.
+    Skip tasks inside current IF/ELSEIF/ELSE block and try running another one
     */
     CmpFailure,
     /*
-    After you reach ";", go back to LOCK defined in position_of_lock.
+    When shell mode is set to CmpSuccess, skip checking any other IF/ELSEIF/ELSE and included subcommands
+    IfDone status will be reset by ENDIF keywords
+    */
+    IfDone,
+    /*
+    After you reach "endlock", go back to LOCK defined in position_of_lock.
     Allow usage of BREAK and CONTNUE
      */
     Lock(usize),
     /*
-    Skip executing commands until you reach END. Go back to LOCK.
+    Skip executing commands until you reach ENDLOCK. Go back to LOCK.
     */
     LockContinue(usize),
     /*
-    Skip executing commands until you reach END. But do not go back to LOCK.
+    Skip executing commands until you reach ENDLOCK. But do not go back to LOCK.
     */
     LockFree,
 }
@@ -93,11 +91,13 @@ fn main() {
                 Ok(e) => e,
             };
 
-            let cmd: Result<String,dialoguer::Error> = dialoguer::Input::new().interact_text();
+            let cmd: Result<String, dialoguer::Error> = dialoguer::Input::new().interact_text();
 
             match cmd {
                 Ok(e) => {
-                    do_rest_of_magic_or_nothing(e.split_whitespace().map(|x| x.to_string()).collect());
+                    do_rest_of_magic_or_nothing(
+                        e.split_whitespace().map(|x| x.to_string()).collect(),
+                    );
                 }
                 Err(e) => {
                     eprintln!("Can't get user input: {e}");
@@ -113,7 +113,9 @@ fn main() {
             set_allow_interrupts(true);
             set_interrupt_now(false);
             match fs::read_to_string(o) {
-                Ok(e) => do_rest_of_magic_or_nothing(e.split_whitespace().map(|x| x.to_string()).collect()),
+                Ok(e) => do_rest_of_magic_or_nothing(
+                    e.split_whitespace().map(|x| x.to_string()).collect(),
+                ),
                 Err(e) => {
                     eprintln!("Unable to read from script file: {:?}", e.kind());
                     process::exit(1);
@@ -190,8 +192,9 @@ fn group_quotationmarks(script: Vec<String>) {
 
 enum Builtins {
     Lock(usize),
-    If(usize),
+    If,
 }
+
 fn syntax_test(script: Vec<String>) {
     let mut line_number = 1;
     let mut used_builtins_history = Vec::new();
@@ -207,17 +210,26 @@ fn syntax_test(script: Vec<String>) {
         };
 
         // Catch usage of logical statements
-        if w == "lock" {
-            used_builtins_history.push(Builtins::Lock(line_number))
+        if w.to_lowercase() == "lock" {
+            used_builtins_history.push(Builtins::Lock(line_number));
         };
-        if w == "if" {
-            used_builtins_history.push(Builtins::If(line_number))
+        if w.to_lowercase() == "if" {
+            used_builtins_history.push(Builtins::If);
         };
 
-        // Any logical statement have to be ended with ';'
+        // Any logical statements have to be ended with associated ending keywords like ENDLOCK or ENDIF
         // If you find it somewhere, remove the last logical statement from history
-        if !w.ends_with("\\;") && w.ends_with(';') {
-            used_builtins_history.pop();
+        if w.to_lowercase().trim() == "endlock" || w.to_lowercase().trim() == "endlock;" {
+            match used_builtins_history.last() {
+                Some(Builtins::Lock(_)) => {used_builtins_history.pop();},
+                _ => errors.push(format!("{line_number}: Usage of \"ENDLOCK\" outside of the \"LOCK\" statement is incorrect")),
+            }
+        }
+        if w.to_lowercase().trim() == "endif" || w.to_lowercase().trim() == "endif;" {
+            match used_builtins_history.last() {
+                Some(Builtins::If) => {used_builtins_history.pop();},
+                _ => errors.push(format!("{line_number}: Usage of \"ENDIF\" outside of the \"IF\" statement is incorrect")),
+            }
         }
 
         // Catch use of free or continue
@@ -229,8 +241,8 @@ fn syntax_test(script: Vec<String>) {
             errors.push(format!("{line_number}: Usage of \"FREE\" or \"CONTINUE\" is not permited outside of the \"LOCK\" statement"));
         }
 
-        // Disallow running empty commands like this: say hello, , say bye
-        if w == "," || w == ";" {
+        // Disallow running empty commands like this: say hello; ; say bye
+        if w == ";" {
             errors.push(format!("{line_number}: Trying to run empty command!"))
         }
     }
@@ -239,8 +251,8 @@ fn syntax_test(script: Vec<String>) {
     if !used_builtins_history.is_empty() {
         for element in used_builtins_history {
             match element {
-                Builtins::Lock(a) => errors.push(format!("{a}: Unclosed \"LOCK\" statement")),
-                Builtins::If(a) => errors.push(format!("{a}: Unclosed \"IF\" statement")),
+                Builtins::Lock(_) => errors.push(format!("Unclosed \"LOCK\" statement")),
+                Builtins::If => errors.push(format!("Unclosed \"IF\" statement")),
             }
         }
     }
@@ -282,26 +294,6 @@ fn run_script(script: Vec<String>) {
     // We'll skip some elseif's and run loops over and over again based on the value of this variable.
     // More about this at the beginning of this source file.
     let mut shell_mode: Vec<ShellModes> = Vec::new();
-    /* IMPORTANT!
-    Since IF, LOOP, WHILE and other blocks can be nested, you always have to check for shell_mode in a good position.
-
-    For example:
-
-
-    if some_command do <<< Set shell_mode to [CmpSuccess] because this example assumes, that 'some_command' returned a success.
-        say running another if... <<< Run this and other tasks below in this IF block
-                                        because of the status saved in shell_modes[0]
-        if another_command do <<< Bump number in 'nesting_level' to 1 and push another ShellMode into shell_mode variable,
-                                    so it might look something like this: [CmpSuccess, CmpSuccess]
-            say OK <<< This task will be executed when 'another_command' returns success.
-                        Check contents of shell_mode[1] to find out whether to run it or not.
-        end <<< Restore 'nesting_level' to 0 and revert shell_mode to [CmpSuccess]
-    elseif something_else do <<< This will be skipped because operation in the previous IF block reported success.
-                                    We know this because of the shell_mode[0]
-        say NOT OK
-    end <<< Revert shell_mode to [CmpReset]
-
-        */
 
     // Until we reach the end of the script
     while index() < script.len() {
@@ -313,58 +305,36 @@ fn run_script(script: Vec<String>) {
         // Is this the last word? The script is ending!
         let the_last_word_in_script = index() == script.len() - 1;
         // Add currently iterated word to a temporary buffer
-        if !w.ends_with("\\,") && w.ends_with(',') {
-            buf.push(w.strip_suffix(',').unwrap().to_string());
-        } else if !w.ends_with("\\;") && w.ends_with(';') {
+        if !w.ends_with("\\;") && w.ends_with(';') {
             buf.push(w.strip_suffix(';').unwrap().to_string());
         } else {
             buf.push(w.clone());
         };
 
-        /*
-        Comma (,) or line feed (\n) symbolizes next command
-        Semicolor (;) symbolizes the end of a logical statement block
-            */
+        let contains_if_done = shell_mode.iter().any(|s| matches!(s, ShellModes::IfDone));
+        let contains_cmp_failure = shell_mode.iter().any(|s| matches!(s, ShellModes::CmpFailure));
+        let contains_lock_free = shell_mode.iter().any(|s| matches!(s, ShellModes::LockFree));
+        let contains_lock_continue = shell_mode
+            .iter()
+            .any(|s| matches!(s, ShellModes::LockContinue(_)));
+        let block_execution = contains_if_done || contains_cmp_failure || contains_lock_free || contains_lock_continue;
 
-        // If we reach the end of a script OR some command separator like '\n' or, ';'...
-        if the_last_word_in_script
-            || (!w.ends_with("\\,") && w.ends_with(','))
-            || (!w.ends_with("\\;") && w.ends_with(';'))
-            || w.ends_with('\n')
-            || (buf.len() < 2 && w == "lock")
-            || (buf.len() < 2 && w == "if")
+        // If we reach the end of a script OR some command separator like '\n' or ';' is found...
+        if the_last_word_in_script || (!w.ends_with("\\;") && w.ends_with(';')) || w.ends_with('\n')
+        // || (buf.len() < 2 && w == "lock")
+        // || (buf.len() < 2 && w == "if")
+        //
         // ... try running the command ...
         {
             // First argument in the buffer (buf[0]) is a program name
             // Check whether it's something built into the shell or not.
             let program_name = buf[0].clone();
-
-            /*
-            In some scenarios, we can't run any command until we reach ";"
-            When this kind of lock is needed, we set this variable to true.
-
-            And these scenarios are simple:
-            Any shell_mode[] is set to LockContinue, LockFree or If
-            The LAST shell_mode is set to CmpFailure
-            */
-            let contains_lock_continue = shell_mode
-                .iter()
-                .any(|s| matches!(s, ShellModes::LockContinue(_)));
-            let contains_lock_free = shell_mode.iter().any(|s| matches!(s, ShellModes::LockFree));
-            let contains_if = shell_mode.iter().any(|s| matches!(s, ShellModes::If(_)));
-            let ends_with_cmp_failure = !shell_mode.is_empty()
-                && matches!(shell_mode[&shell_mode.len() - 1], ShellModes::CmpFailure);
-
-            let ultimate_end_lock = contains_if
-                || contains_lock_continue
-                || contains_lock_free
-                || ends_with_cmp_failure;
-
-            //dbg!(&program_name, ultimate_end_lock, contains_lock_continue, contains_lock_free, ends_with_cmp_failure, &shell_mode);
-
-            if !ultimate_end_lock {
-                match program_name.as_str() {
+            if !block_execution {
+                match remove_quotationmarks(program_name).as_str() {
                     /*
+                    marbulec was here
+                    dito
+
                     When we reach the LOCK keyword, we have to remember it's position and set working shell_mode to 'Lock'
                     When lock mode is enabled, Rush will execute all commands inside of an lock block until it reaches END keyword.
                     Then, Rush will jump back to the position of LOCK and execute all of the commands again and again and again...
@@ -389,19 +359,19 @@ fn run_script(script: Vec<String>) {
                     set val 0
                     lock
                         set val 5
-                        if $val = 5 do
+                        if $val = 5;
                             free
                             say "Don't run it"
-                        ;
+                        endif
                         say "This can't be seen"
-                    ;
+                    endlock
 
                     In the example below, FREE or CONTINUE keyword may be used when we're not in the LOCK directly.
                     Therefore, we need to look back for the LAST possible shell_mode with Lock value and change it to LockFree/LockContinue
 
                     To prevent execution of any command after FREE/CONTINUE (doesn't matter if it's still an IF stmt. or smth. outside of it in LOCK itself),
                     shell must remember that there is at least one LockFree/LockContinue value
-                        */
+                    */
                     "free" => {
                         let mut position_of_found_lock_mode_in_shellmodes = 0;
                         // Check if we are in a LOCK mode somewhere in shell_mode list (look for 'Lock' mode from the end of a list)
@@ -419,7 +389,7 @@ fn run_script(script: Vec<String>) {
                         // If we are NOT in a LOCK in any way
                         else {
                             let e = ("Usage of \"FREE\" is not permited outside of the \"LOCK\" statement.").to_string();
-                            print_err(e, program_name, line_number)
+                            print_err(e, program_name.clone(), line_number)
                         }
                     }
                     "continue" => {
@@ -440,14 +410,16 @@ fn run_script(script: Vec<String>) {
                                         ShellModes::LockContinue(number);
                                 }
                                 _ => {
-                                    unreachable!("Program's logic contradics itself! Please, report this error!");
+                                    unreachable!(
+                                            "Program's logic contradics itself! Please, report this error!"
+                                        );
                                 }
                             }
                         }
                         // If we are NOT in a LOCK in any way
                         else {
                             let e = ("Usage of \"CONTINUE\" is not permited outside of the \"LOCK\" statement.").to_string();
-                            print_err(e, program_name, line_number)
+                            print_err(e, program_name.clone(), line_number)
                         }
                     }
 
@@ -457,90 +429,149 @@ fn run_script(script: Vec<String>) {
 
                         // Set shell_mode to Lock and save it's position
                         let position_of_program_name_in_script = index();
-                        shell_mode.push(ShellModes::If(position_of_program_name_in_script));
+                        let out = r#if::logic(buf.clone());
+                        //dbg!(&out);
+                        match out {
+                            Ok(true) => shell_mode.push(ShellModes::CmpSuccess),
+                            Ok(false) => shell_mode.push(ShellModes::CmpFailure),
+                            Err(e) => print_err(e, program_name.clone(), line_number),
+                        };
                     }
+                    "elseif" => {
+                        // Is it running after unsuccessfull IF/ELSEIF?
+                        match shell_mode[nesting_level] {
+                            ShellModes::CmpFailure => {
+                                // Set shell_mode to Lock and save it's position
+                                let position_of_program_name_in_script = index();
+                                match r#if::logic(buf.clone()) {
+                                    Ok(true) => shell_mode.push(ShellModes::CmpSuccess),
+                                    Ok(false) => shell_mode.push(ShellModes::CmpFailure),
+                                    Err(e) => print_err(e, program_name.clone(), line_number),
+                                };
+                            }
+                            ShellModes::CmpSuccess => {
+                                shell_mode[nesting_level] = ShellModes::IfDone
+                            }
+                            ShellModes::IfDone => (),
+                            _ => {
+                                let e =
+                                    "Usage of \"ELSEIF\" outside of an IF statement is incorrect"
+                                        .to_string();
+                                print_err(e, program_name.clone(), line_number);
+                            }
+                        };
+                    }
+                    "else" => {
+                        todo!();
+                    }
+
                     "set" => {
                         if let Err(e) = variables::setenv(&buf) {
-                            print_err(e, program_name, line_number);
+                            print_err(e, program_name.clone(), line_number);
                         };
                     }
                     "rem" => {
                         if let Err(e) = variables::remenv(&buf) {
-                            print_err(e, program_name, line_number);
+                            print_err(e, program_name.clone(), line_number);
                         };
                     }
                     "get" => match variables::getenv(&buf) {
                         Ok(res) => println!("{res}"),
-                        Err(e) => print_err(e, program_name, line_number),
+                        Err(e) => print_err(e, program_name.clone(), line_number),
                     },
                     "++" => {
                         if let Err(e) = variables::chenv(&buf, true) {
-                            print_err(e, program_name, line_number);
+                            print_err(e, program_name.clone(), line_number);
                         };
                     }
                     "--" => {
                         if let Err(e) = variables::chenv(&buf, false) {
-                            print_err(e, program_name, line_number);
+                            print_err(e, program_name.clone(), line_number);
                         };
                     }
 
                     "gt" => {
                         if let Err(e) = directories::gt(&buf) {
-                            print_err(e, program_name, line_number);
+                            print_err(e, program_name.clone(), line_number);
                         };
                     }
 
                     "panic" => {
                         panic!("User invoked panic");
                     }
+                    "exit" => {
+                        process::exit(0);
+                    }
 
                     // Comments will never be run
-                    "#" => {}
+                    "#" | "endif" | "endlock" => {()},
                     // Not built in?
                     _ => {
-                        if let Err(e) = exec::exec(&buf) {
-                            print_err(e, program_name, line_number);
-                        }
+                            if let Err(e) = exec::exec(&buf) {
+                                print_err(e, program_name.clone(), line_number);
+                            }
+                            let mut resolved_buf = resolver(buf.iter().collect(), true, true);
+                            match resolved_buf {
+                                Err(e) => print_err(e, program_name, line_number),
+                                Ok(gg) => exec(gg),
+                            }
                     }
                 };
-            };
-
-            // Check previous command
-            if !w.ends_with("\\;") && w.ends_with(';') {
-                let nest = nesting_level.saturating_sub(1);
-                //std::thread::sleep(std::time::Duration::from_millis(1000));
-                if !shell_mode.is_empty() {
-                    match shell_mode[nest] {
-                        // If current shell_mode is set to Lock or LockContinue,
-                        // go back to the index number of lock keyword position in script.
-                        ShellModes::Lock(a) | ShellModes::LockContinue(a) => {
-                            set_index(a);
-                            shell_mode[nest] = ShellModes::Lock(a);
-                        }
-                        ShellModes::LockFree | ShellModes::CmpSuccess | ShellModes::CmpFailure => {
-                            shell_mode.remove(nest);
-                            nesting_level = nest;
-                        }
-                        ShellModes::If(_) => {
-                            match r#if::logic(buf.clone()) {
-                                Err(e) => {
-                                    print_err(e, global::PROGRAM_NAME.to_string(), line_number)
-                                }
-                                Ok(res) => {
-                                    if res {
-                                        shell_mode.push(ShellModes::CmpSuccess)
-                                    } else {
-                                        shell_mode.push(ShellModes::CmpFailure)
-                                    }
-                                }
-                            };
+                // ... and finally, after command is done, clear the buffer
+                buf.clear();
+            }
+            match program_name.as_str() {
+                "endlock" => {
+                    let mut position_of_found_lock_mode_in_shellmodes = 0;
+                    // Check if we are in a LOCK mode somewhere in shell_mode list (look for 'Lock' mode from the end of a list)
+                    let inlock = shell_mode.iter().rev().enumerate().any(|s| {
+                        let a = s.1;
+                        position_of_found_lock_mode_in_shellmodes = (&shell_mode.len() - 1) - s.0;
+                        matches!(a, ShellModes::Lock { .. })
+                    });
+                    if inlock {
+                        match shell_mode[nesting_level-1] {
+                            // If current shell_mode is set to Lock or LockContinue,
+                            // go back to the position of LOCK so we'll execute it again as intended.
+                            ShellModes::Lock(a) | ShellModes::LockContinue(a) => {
+                                set_index(position_of_found_lock_mode_in_shellmodes);
+                                shell_mode[nesting_level] = ShellModes::Lock(a);
+                            }
+                            // Set free from LOCK loop
+                            ShellModes::LockFree => {
+                                shell_mode.pop();
+                                nesting_level -= 1;
+                            }
+                            _ => {
+                                let e = "Usage of \"ENDLOCK\" in wrong nesting".to_string();
+                                print_err(e, program_name, line_number);
+                            }
                         }
                     }
-                }
+                },
+                "endif" => {
+                    let mut position_of_found_if_mode_in_shellmodes = 0;
+                    // Check if we are in a LOCK mode somewhere in shell_mode list (look for 'Lock' mode from the end of a list)
+                    let inif = shell_mode.iter().rev().enumerate().any(|s| {
+                        let a = s.1;
+                        position_of_found_if_mode_in_shellmodes = (&shell_mode.len() - 1) - s.0;
+                        matches!(a, ShellModes::CmpFailure) || matches!(a, ShellModes::CmpSuccess) || matches!(a, ShellModes::IfDone)
+                    });
+                    if inif {
+                        match shell_mode[nesting_level-1] {
+                            ShellModes::CmpSuccess | ShellModes::CmpFailure | ShellModes::IfDone => {
+                                shell_mode.pop();
+                                nesting_level -= 1;
+                            }
+                            _ => {
+                                let e = "Usage of \"ENDIF\" in wrong nesting".to_string();
+                                print_err(e, program_name, line_number);
+                            }
+                        }
+                    }
+                },
+                _ => (),
             };
-
-            // ... and finally, after command is done, clear the buffer
-            buf.clear();
         }
 
         // Bump line number if we find a new line character

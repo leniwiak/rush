@@ -1,4 +1,5 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::env;
 
 pub static PROGRAM_NAME: &str = "Rush";
 
@@ -34,8 +35,8 @@ pub fn allow_interrupts() -> bool {
 }
 
 // This function prints out an error that just occured and tells the user on which line it happened
-pub fn print_err(e: String, program_name: String, line_number: usize) {
-    eprintln!("Program \"{program_name}\" returned an error at line {line_number}:\n{e}");
+pub fn print_err<S:AsRef<str>>(e: S, program_name: S, line_number: usize) {
+    eprintln!("Program \"{}\" returned an error at line {line_number}:\n{}", program_name.as_ref(), e.as_ref());
     //process::exit(1);
 }
 
@@ -51,4 +52,73 @@ pub fn remove_quotationmarks<S:AsRef<str>>(input: S) -> String {
         }
     }
     str
+}
+
+enum ResolvingMode {
+    SingleQuote,
+    DoubleQuote,
+    Variable,
+    None
+}
+
+// This function removes unescaped slashes
+pub fn resolver<S:AsRef<str>>(input: S, remove_quotation_marks:bool, resolve_variables:bool) -> Result<String, String> {
+    let mut previous_c= ' ';
+    let mut variable_name = String::new();
+    let mut output = String::new();
+    let mut mode = ResolvingMode::None;
+    for c in input.as_ref().chars() {
+        if c == '\'' && previous_c != '\\' {
+            match mode {
+                ResolvingMode::None => mode = ResolvingMode::SingleQuote,
+                ResolvingMode::SingleQuote => mode = ResolvingMode::None,
+                _ => (),
+            }
+        }
+        else if c == '"' && previous_c != '\\' {
+            match mode {
+                ResolvingMode::None => mode = ResolvingMode::DoubleQuote,
+                ResolvingMode::DoubleQuote => mode = ResolvingMode::None,
+                _ => (),
+            }
+        }
+        else if c == '$' && previous_c != '\\' && resolve_variables {
+            match mode {
+                ResolvingMode::None => mode = ResolvingMode::Variable,
+                _ => (),
+            }
+        }
+        else if c == ' ' {
+            match mode {
+                ResolvingMode::Variable => mode = ResolvingMode::None,
+                _ => (),
+            }
+        }
+        else if c == '\\' && previous_c != '\\' {
+            ();
+        }
+        else {
+            match mode {
+                ResolvingMode::Variable => variable_name.push(c),
+                _ => {
+                    if !variable_name.is_empty() {
+                        let env = env::var(&variable_name);
+                        match env {
+                            Err(e) => return Err(format!("{variable_name}: Reference to a variable caused an error: {:?}", e)),
+                            Ok(variable_contents) => output.push_str(&variable_contents),
+                        }
+                        variable_name.clear();
+                    }
+                    output.push(c);
+                },
+            }
+        }
+
+        if (c == '\'' || c == '"')  && !remove_quotation_marks {
+            output.push(c);
+        }
+
+        previous_c = c;
+    }
+    Ok(output)
 }

@@ -1,6 +1,6 @@
+use crate::global;
 use std::env;
 use std::process;
-use crate::global;
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 enum DataType {
@@ -17,11 +17,11 @@ enum DataType {
     Okval,
 }
 
-pub fn logic(buf: Vec<String>) -> Result<bool, String> {
+pub fn logic(mut buf: Vec<String>) -> Result<bool, String> {
     /*
     if FAIL:thing1 -with-arg -with-another-arg and OK:thing2 or OUT:thing3 and $variable == 10;
         say "I'm a bunch of words on your screen"
-    ;
+    endif
 
     Possible keyword types are:
     OK - Execute a command name with 0 it's exit code is 0 or 1 if anything else
@@ -133,6 +133,10 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
 
     let mut append_to_last_word_instead_buf = false;
     // Iterate through words except the first one which is just "IF"
+
+    // Remove first word in a buffer.
+    // Starting IF/ELSEIF/ELSE is useless here
+    buf.remove(0);
 
     /*
     Join any words after CODE:program_name.
@@ -277,7 +281,7 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
     let mut idx = 0;
     while idx < big_mommy.len() {
         big_mommy[idx].1 = global::remove_quotationmarks(&big_mommy[idx].1);
-        idx+=1;
+        idx += 1;
     }
 
     // Basically, after every thing to compare, there must be a comparator.
@@ -289,12 +293,18 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
         if idx % 2 == 0
             && (matches!(dataunit.0, DataType::Logic) | matches!(dataunit.0, DataType::Comparator))
         {
-            return Err(format!("Expected a thing to compare in place of \"{}\"", dataunit.1));
+            return Err(format!(
+                "Expected a thing to compare in place of \"{}\"",
+                dataunit.1
+            ));
         } else if idx % 2 != 0
             && !matches!(dataunit.0, DataType::Logic)
             && !matches!(dataunit.0, DataType::Comparator)
         {
-            return Err(format!("Expected a comparator in place of \"{}\"", dataunit.1));
+            return Err(format!(
+                "Expected a comparator in place of \"{}\"",
+                dataunit.1
+            ));
         } else {
             //println!("{}", dataunit.1);
         }
@@ -432,7 +442,7 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
 
                 let replace_group_with = {
                     // User compares two OKVALs separated by some AND/OR logic keyword
-                    if  matches!(first_dataunit_type, DataType::Okval)
+                    if matches!(first_dataunit_type, DataType::Okval)
                         && (this_comparator_content == "AND" || this_comparator_content == "OR")
                     {
                         let this_comparator_is_true = this_comparator_content == "AND";
@@ -450,63 +460,107 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
                     }
                     // User compares two NUMVALs
                     else if matches!(first_dataunit_type, DataType::Numval) {
-                        let first_dataunit_content = first_dataunit_content.parse::<usize>().unwrap();
-                        let second_dataunit_content = second_dataunit_content.parse::<usize>().unwrap();
+                        let first_dataunit_content =
+                            first_dataunit_content.parse::<usize>().unwrap();
+                        let second_dataunit_content =
+                            second_dataunit_content.parse::<usize>().unwrap();
                         match this_comparator_content.as_str() {
                             "EQUAL" => {
-                                if first_dataunit_content == second_dataunit_content {1}
-                                else {0}
-                            },
+                                if first_dataunit_content == second_dataunit_content {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
                             "DIFFERENT" => {
-                                if first_dataunit_content != second_dataunit_content {1}
-                                else {0}
-                            },
+                                if first_dataunit_content != second_dataunit_content {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
                             "LESS" => {
-                                if first_dataunit_content < second_dataunit_content {1}
-                                else {0}
-                            },
+                                if first_dataunit_content < second_dataunit_content {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
                             "LESS_OR_EQUAL" => {
-                                if first_dataunit_content <= second_dataunit_content {1}
-                                else {0}
-                            },
+                                if first_dataunit_content <= second_dataunit_content {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
                             "GREATER" => {
-                                if first_dataunit_content > second_dataunit_content {1}
-                                else {0}
-                            },
+                                if first_dataunit_content > second_dataunit_content {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
                             "GREATER_OR_EQUAL" => {
-                                if first_dataunit_content >= second_dataunit_content {1}
-                                else {0}
-                            },
-                            _ => return Err(format!("Untolerable comparator for number values: \"{}\"", this_comparator_content)),
+                                if first_dataunit_content >= second_dataunit_content {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
+                            _ => {
+                                return Err(format!(
+                                    "Untolerable comparator for number values: \"{}\"",
+                                    this_comparator_content
+                                ))
+                            }
                         }
                     }
                     // User compares two TXTVALs
-                    else if  matches!(first_dataunit_type, DataType::Txtval) {
+                    else if matches!(first_dataunit_type, DataType::Txtval) {
                         match this_comparator_content.as_str() {
                             "EQUAL" => {
-                                if first_dataunit_content == second_dataunit_content {1}
-                                else {0}
-                            },
+                                if first_dataunit_content == second_dataunit_content {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
                             "DIFFERENT" => {
-                                if first_dataunit_content != second_dataunit_content {1}
-                                else {0}
-                            },
+                                if first_dataunit_content != second_dataunit_content {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
                             "CONTAINS" => {
-                                if first_dataunit_content.contains(&second_dataunit_content) {1}
-                                else {0}
-                            },
+                                if first_dataunit_content.contains(&second_dataunit_content) {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
                             "STARTS_WITH" => {
-                                if first_dataunit_content.starts_with(&second_dataunit_content) {1}
-                                else {0}
-                            },
+                                if first_dataunit_content.starts_with(&second_dataunit_content) {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
                             "ENDS_WITH" => {
-                                if first_dataunit_content.ends_with(&second_dataunit_content) {1}
-                                else {0}
-                            },
-                            _ => return Err(format!("Untolerable comparator for text values: \"{}\"", this_comparator_content)),
+                                if first_dataunit_content.ends_with(&second_dataunit_content) {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
+                            _ => {
+                                return Err(format!(
+                                    "Untolerable comparator for text values: \"{}\"",
+                                    this_comparator_content
+                                ))
+                            }
                         }
-                    }
-                    else {
+                    } else {
                         dbg!(
                             &big_mommy,
                             idx,
@@ -515,9 +569,11 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
                             &big_mommy[idx]
                         );
                         unreachable!("Program's logic contradics itself! Please, report this error to maintainers!\nDon't forget to share all of the debugging information above.");
-                    }  
+                    }
                 };
-                //dbg!(&big_mommy[idx - 2], &big_mommy[idx - 1], &big_mommy[idx]);
+
+                // dbg!(&big_mommy[idx - 2], &big_mommy[idx - 1], &big_mommy[idx]);
+
                 // Remove three last elements in IF logic memory
                 big_mommy.remove(idx);
                 big_mommy.remove(idx - 1);
@@ -526,17 +582,17 @@ pub fn logic(buf: Vec<String>) -> Result<bool, String> {
                 big_mommy.insert(idx - 2, (DataType::Okval, replace_group_with.to_string()));
                 // Decrease IDX so it doesn't abnormally overflow
                 idx -= 2;
-                
             }
             idx += 1;
-        };
-        
+        }
+
         if big_mommy.len() == 1 && !matches!(big_mommy[0].0, DataType::Okval) {
             dbg!(&big_mommy);
             unreachable!("Program's logic contradicts itself! Please, report this error to maintainers!\nDon't forget to share all of the debugging information above.")
         }
     }
-    dbg!(big_mommy);
+    // dbg!(big_mommy);
 
-    Ok(true)
+    let result_is_true = big_mommy[0].1 == "1";
+    Ok(result_is_true)
 }
