@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::env;
+use std::process;
 
 pub static PROGRAM_NAME: &str = "Rush";
 
@@ -37,7 +38,7 @@ pub fn allow_interrupts() -> bool {
 // This function prints out an error that just occured and tells the user on which line it happened
 pub fn print_err<S:AsRef<str>>(e: S, program_name: S, line_number: usize) {
     eprintln!("Program \"{}\" returned an error at line {line_number}:\n{}", program_name.as_ref(), e.as_ref());
-    //process::exit(1);
+    set_interrupt_now(true);
 }
 
 // Remove all unescaped quotationmarks even inside words

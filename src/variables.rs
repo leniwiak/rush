@@ -41,7 +41,9 @@ pub fn setenv(buf: &[String]) -> Result<(), String> {
         }
 
         // trim _end() is going to remove any trailing white characters at the end
-        set_var(&buf[1], value.trim_end());
+        unsafe {
+            set_var(&buf[1], value.trim_end());
+        }
         Ok(())
     }
 }
@@ -60,7 +62,9 @@ pub fn remenv(buf: &[String]) -> Result<(), String> {
                 buf[1]
             ));
         }
-        remove_var(&buf[1]);
+        unsafe {
+            remove_var(&buf[1]);
+        }
         Ok(())
     }
 }
@@ -95,9 +99,13 @@ pub fn chenv(buf: &[String], increment: bool) -> Result<(), String> {
                             Ok(a) => {
                                 // Increment/decrement and set it up
                                 if increment {
-                                    set_var(&buf[1], (a + set).to_string());
+                                    unsafe {
+                                        set_var(&buf[1], (a + set).to_string());
+                                    }
                                 } else {
-                                    set_var(&buf[1], (a - set).to_string());
+                                    unsafe {
+                                        set_var(&buf[1], (a - set).to_string());
+                                    }
                                 }
                                 Ok(())
                             }

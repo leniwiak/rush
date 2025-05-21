@@ -21,31 +21,19 @@ use global::{
 
 #[derive(Debug)]
 enum ShellModes {
-    /*
-    Run all commands inside IF/ELSEIF/ELSE block
-    */
+    // Run all commands inside IF/ELSEIF/ELSE block
     CmpSuccess,
-    /*
-    Skip tasks inside current IF/ELSEIF/ELSE block and try running another one
-    */
+    // Skip tasks inside current IF/ELSEIF/ELSE block and try running another one
     CmpFailure,
-    /*
-    When shell mode is set to CmpSuccess, skip checking any other IF/ELSEIF/ELSE and included subcommands
-    IfDone status will be reset by ENDIF keywords
-    */
+    // When shell mode is set to CmpSuccess, skip checking any other IF/ELSEIF/ELSE and included subcommands
+    // IfDone status will be reset by ENDIF keywords
     IfDone,
-    /*
-    After you reach "endlock", go back to LOCK defined in position_of_lock.
-    Allow usage of BREAK and CONTNUE
-     */
+    // After you reach "endlock", go back to LOCK defined in position_of_lock.
+    // Allow usage of BREAK and CONTNUE
     Lock(usize),
-    /*
-    Skip executing commands until you reach ENDLOCK. Go back to LOCK.
-    */
+    // Skip executing commands until you reach ENDLOCK. Go back to LOCK.
     LockContinue(usize),
-    /*
-    Skip executing commands until you reach ENDLOCK. But do not go back to LOCK.
-    */
+    // Skip executing commands until you reach ENDLOCK. But do not go back to LOCK.
     LockFree,
 }
 
@@ -191,7 +179,7 @@ fn group_quotationmarks(script: Vec<String>) {
 }
 
 enum Builtins {
-    Lock(usize),
+    Lock,
     If,
 }
 
@@ -211,7 +199,7 @@ fn syntax_test(script: Vec<String>) {
 
         // Catch usage of logical statements
         if w.to_lowercase() == "lock" {
-            used_builtins_history.push(Builtins::Lock(line_number));
+            used_builtins_history.push(Builtins::Lock);
         };
         if w.to_lowercase() == "if" {
             used_builtins_history.push(Builtins::If);
@@ -221,7 +209,7 @@ fn syntax_test(script: Vec<String>) {
         // If you find it somewhere, remove the last logical statement from history
         if w.to_lowercase().trim() == "endlock" || w.to_lowercase().trim() == "endlock;" {
             match used_builtins_history.last() {
-                Some(Builtins::Lock(_)) => {used_builtins_history.pop();},
+                Some(Builtins::Lock) => {used_builtins_history.pop();},
                 _ => errors.push(format!("{line_number}: Usage of \"ENDLOCK\" outside of the \"LOCK\" statement is incorrect")),
             }
         }
@@ -236,22 +224,22 @@ fn syntax_test(script: Vec<String>) {
         if (w == "free" || w == "continue")
             && !used_builtins_history
                 .iter()
-                .any(|x| matches!(x, Builtins::Lock(_)))
+                .any(|x| matches!(x, Builtins::Lock))
         {
             errors.push(format!("{line_number}: Usage of \"FREE\" or \"CONTINUE\" is not permited outside of the \"LOCK\" statement"));
         }
 
         // Disallow running empty commands like this: say hello; ; say bye
-        if w == ";" {
-            errors.push(format!("{line_number}: Trying to run empty command!"))
-        }
+        // if w == ";" {
+        //     errors.push(format!("{line_number}: Trying to run empty command!"))
+        // }
     }
 
     // Summarize looking for unclosed logical statements
     if !used_builtins_history.is_empty() {
         for element in used_builtins_history {
             match element {
-                Builtins::Lock(_) => errors.push(("Unclosed \"LOCK\" statement").to_string()),
+                Builtins::Lock => errors.push(("Unclosed \"LOCK\" statement").to_string()),
                 Builtins::If => errors.push(("Unclosed \"IF\" statement").to_string()),
             }
         }
@@ -317,7 +305,13 @@ fn run_script(script: Vec<String>) {
         let contains_lock_continue = shell_mode
             .iter()
             .any(|s| matches!(s, ShellModes::LockContinue(_)));
-        let block_execution = contains_if_done || contains_cmp_failure || contains_lock_free || contains_lock_continue;
+
+        let block_execution =
+            contains_if_done ||
+            contains_cmp_failure ||
+            contains_lock_free ||
+            contains_lock_continue;
+
 
         // If we reach the end of a script OR some command separator like '\n' or ';' is found...
         if the_last_word_in_script || (!w.ends_with("\\;") && w.ends_with(';')) || w.ends_with('\n')
@@ -326,6 +320,8 @@ fn run_script(script: Vec<String>) {
         //
         // ... try running the command ...
         {
+            dbg!(&buf);
+
             // First argument in the buffer (buf[0]) is a program name
             // Check whether it's something built into the shell or not.
             let program_name = buf[0].clone();
@@ -410,9 +406,7 @@ fn run_script(script: Vec<String>) {
                                         ShellModes::LockContinue(number);
                                 }
                                 _ => {
-                                    unreachable!(
-                                            "Program's logic contradics itself! Please, report this error!"
-                                        );
+                                    unreachable!("Program's logic contradics itself! Please, report this error!");
                                 }
                             }
                         }
@@ -430,20 +424,21 @@ fn run_script(script: Vec<String>) {
                         // Set shell_mode to Lock and save it's position
                         let position_of_program_name_in_script = index();
                         let out = r#if::logic(buf.clone());
-                        //dbg!(&out);
                         match out {
                             Ok(true) => shell_mode.push(ShellModes::CmpSuccess),
                             Ok(false) => shell_mode.push(ShellModes::CmpFailure),
                             Err(e) => print_err(e, program_name.clone(), line_number),
                         };
                     }
-                    "elseif" => {
-                        // Is it running after unsuccessfull IF/ELSEIF?
+                    "elseif" | "eif" => {
+                        dbg!(&shell_mode[nesting_level]);
                         match shell_mode[nesting_level] {
+                            // Is it running after unsuccessfull IF/ELSEIF?
                             ShellModes::CmpFailure => {
                                 // Set shell_mode to Lock and save it's position
                                 let position_of_program_name_in_script = index();
-                                match r#if::logic(buf.clone()) {
+                                let out = r#if::logic(buf.clone());
+                                match out {
                                     Ok(true) => shell_mode.push(ShellModes::CmpSuccess),
                                     Ok(false) => shell_mode.push(ShellModes::CmpFailure),
                                     Err(e) => print_err(e, program_name.clone(), line_number),
@@ -519,9 +514,10 @@ fn run_script(script: Vec<String>) {
                             // }
                     }
                 };
-                // ... and finally, after command is done, clear the buffer
-                buf.clear();
             }
+            // ... and finally, after command is done, clear the buffer
+            buf.clear();
+
             match program_name.as_str() {
                 "endlock" => {
                     let mut position_of_found_lock_mode_in_shellmodes = 0;
@@ -557,7 +553,9 @@ fn run_script(script: Vec<String>) {
                     let inif = shell_mode.iter().rev().enumerate().any(|s| {
                         let a = s.1;
                         position_of_found_if_mode_in_shellmodes = (&shell_mode.len() - 1) - s.0;
-                        matches!(a, ShellModes::CmpFailure) || matches!(a, ShellModes::CmpSuccess) || matches!(a, ShellModes::IfDone)
+                        matches!(a, ShellModes::CmpFailure)
+                        || matches!(a, ShellModes::CmpSuccess)
+                        || matches!(a, ShellModes::IfDone)
                     });
                     if inif {
                         match shell_mode[nesting_level-1] {

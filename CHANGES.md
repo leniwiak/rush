@@ -211,6 +211,17 @@ Thanks Rust.
 - RUSH: Use library 'dialoguer' instead of 'libinput' from carrot-libs
 - IF: It works! (hopefully)
 
+### Added on 20.05.2025
+
+- IF: It is able to compare command's STDOUT and STDERR
+
+# Release 0.5.3
+
+### Added on 21.05.2025
+
+- Upgrade to Rust 2024 Edition
+- Remove unneeded code
+
 ### Waiting features:
 
 - ELSEIF, ELSE
